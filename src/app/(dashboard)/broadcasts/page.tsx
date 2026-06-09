@@ -82,6 +82,11 @@ export default function BroadcastsPage() {
 
   useEffect(() => {
     fetchBroadcasts();
+
+    window.addEventListener('refresh-data', fetchBroadcasts);
+    return () => {
+      window.removeEventListener('refresh-data', fetchBroadcasts);
+    };
   }, []);
 
   const anySending = useMemo(

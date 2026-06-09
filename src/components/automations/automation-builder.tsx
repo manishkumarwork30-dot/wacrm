@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -88,6 +88,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   condition: { label: "Condition (If/Else)", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "Send Webhook", icon: Webhook, border: "border-l-primary" },
   close_conversation: { label: "Close Conversation", icon: CircleSlash, border: "border-l-primary" },
+  send_tower_document: { label: "Send Tower Document", icon: FileText, border: "border-l-primary" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -102,6 +103,7 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "condition",
   "send_webhook",
   "close_conversation",
+  "send_tower_document",
 ]
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string; hint: string }[] = [
@@ -116,6 +118,7 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string; hint: stri
   { value: "conversation_assigned", label: "Conversation Assigned", hint: "When assigned to an agent" },
   { value: "tag_added", label: "Tag Added", hint: "When a tag is added to a contact" },
   { value: "time_based", label: "Time-Based", hint: "On a recurring schedule" },
+  { value: "tower_chatbot_completed", label: "Tower Chatbot Completed", hint: "Triggers when a lead says YES to the final terms in the tower chatbot" },
 ]
 
 function cid(): string {
@@ -150,6 +153,8 @@ function blankConfig(type: AutomationStepType): Record<string, unknown> {
       return { url: "", headers: {}, body_template: "" }
     case "close_conversation":
       return {}
+    case "send_tower_document":
+      return { caption: "Congratulations! Your location has been successfully verified for the tower installation." }
     default:
       return {}
   }
@@ -710,6 +715,34 @@ function StepEditor({
   const set = (patch: Record<string, unknown>) =>
     onChange({ ...step, step_config: { ...cfg, ...patch } })
 
+  // Fetch approved templates for send_template dropdown
+  const [templates, setTemplates] = useState<{ name: string; language: string }[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+
+  useEffect(() => {
+    if (step.step_type !== "send_template") return
+    let cancelled = false
+    async function load() {
+      setLoadingTemplates(true)
+      const { createClient } = await import("@/lib/supabase/client")
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("message_templates")
+        .select("name, language")
+        .eq("status", "Approved")
+        .order("name", { ascending: true })
+      if (cancelled) return
+      if (data) {
+        setTemplates(data)
+      }
+      setLoadingTemplates(false)
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [step.step_type])
+
   switch (step.step_type) {
     case "send_message":
       return (
@@ -726,17 +759,50 @@ function StepEditor({
       return (
         <>
           <FieldBlock label="Template name">
-            <Input
-              value={(cfg.template_name as string) ?? ""}
-              onChange={(e) => set({ template_name: e.target.value })}
-              className="bg-slate-800 text-white"
-            />
+            {loadingTemplates ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading templates...
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="space-y-1">
+                <Input
+                  value={(cfg.template_name as string) ?? ""}
+                  onChange={(e) => set({ template_name: e.target.value })}
+                  placeholder="Type template name manually..."
+                  className="bg-slate-800 text-white"
+                />
+                <p className="text-[10px] text-amber-500">
+                  No approved templates found. Sync templates in Settings first.
+                </p>
+              </div>
+            ) : (
+              <select
+                value={(cfg.template_name as string) ?? ""}
+                onChange={(e) => {
+                  const selectedName = e.target.value
+                  const matched = templates.find((t) => t.name === selectedName)
+                  set({
+                    template_name: selectedName,
+                    language: matched ? matched.language : "en_US",
+                  })
+                }}
+                className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white focus:outline-none"
+              >
+                <option value="">-- Select template --</option>
+                {templates.map((t) => (
+                  <option key={`${t.name}_${t.language}`} value={t.name}>
+                    {t.name} ({t.language})
+                  </option>
+                ))}
+              </select>
+            )}
           </FieldBlock>
           <FieldBlock label="Language">
             <Input
               value={(cfg.language as string) ?? ""}
               onChange={(e) => set({ language: e.target.value })}
               className="bg-slate-800 text-white"
+              disabled={templates.length > 0}
             />
           </FieldBlock>
         </>
@@ -957,6 +1023,8 @@ function previewFor(step: BuilderStep): string {
       return `when ${step.step_config.subject ?? "?"}`
     case "send_webhook":
       return (step.step_config.url as string) || "no url"
+    case "send_tower_document":
+      return (step.step_config.caption as string) || "send document"
     default:
       return ""
   }

@@ -18,6 +18,10 @@ import {
   LogOut,
   User,
   X,
+  Database,
+  LayoutTemplate,
+  Shield,
+  FileText,
 } from "lucide-react";
 import {
   Avatar,
@@ -47,8 +51,10 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/contacts", label: "Contacts", icon: Users },
+  { href: "/leads", label: "Leads", icon: Database },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/broadcasts", label: "Broadcasts", icon: Radio },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/automations", label: "Automations", icon: Zap },
   { href: "/flows", label: "Flows", icon: Workflow, beta: true },
 ];
@@ -67,6 +73,20 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const totalUnread = useTotalUnread();
+
+  const displayNavItems = [...navItems];
+  if (profile?.role === "super_admin") {
+    displayNavItems.push({
+      href: "/admin/users",
+      label: "Admin Panel",
+      icon: Shield,
+    });
+    displayNavItems.push({
+      href: "/admin/approvals",
+      label: "Sent Approvals",
+      icon: FileText,
+    });
+  }
 
   // Close the drawer when route changes — users opened it to navigate,
   // so once they pick a destination the drawer should get out of the way.
@@ -144,7 +164,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         {/* Main navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-1">
-            {navItems.map((item) => {
+            {displayNavItems.map((item) => {
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/dashboard" && pathname.startsWith(item.href));

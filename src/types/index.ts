@@ -256,7 +256,8 @@ export type AutomationTriggerType =
   | 'new_contact_created'
   | 'conversation_assigned'
   | 'tag_added'
-  | 'time_based';
+  | 'time_based'
+  | 'tower_chatbot_completed';
 
 export type AutomationStepType =
   | 'send_message'
@@ -269,7 +270,8 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
-  | 'close_conversation';
+  | 'close_conversation'
+  | 'send_tower_document';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 
@@ -352,6 +354,10 @@ export interface SendWebhookStepConfig {
   body_template?: string;
 }
 
+export interface SendTowerDocumentStepConfig {
+  caption?: string;
+}
+
 export type AutomationStepConfig =
   | SendMessageStepConfig
   | SendTemplateStepConfig
@@ -362,6 +368,7 @@ export type AutomationStepConfig =
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
+  | SendTowerDocumentStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 

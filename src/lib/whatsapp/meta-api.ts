@@ -113,6 +113,55 @@ export async function sendTextMessage(
   return { messageId: data.messages[0].id }
 }
 
+export interface SendDocumentMessageArgs {
+  phoneNumberId: string
+  accessToken: string
+  to: string
+  documentUrl: string
+  filename?: string
+  caption?: string
+  contextMessageId?: string
+}
+
+/**
+ * Send a document message via a URL.
+ */
+export async function sendDocumentMessage(
+  args: SendDocumentMessageArgs
+): Promise<MetaSendResult> {
+  const { phoneNumberId, accessToken, to, documentUrl, filename, caption, contextMessageId } = args
+  const url = `${META_API_BASE}/${phoneNumberId}/messages`
+  
+  const document: Record<string, unknown> = { link: documentUrl }
+  if (filename) document.filename = filename
+  if (caption) document.caption = caption
+
+  const body: Record<string, unknown> = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'document',
+    document,
+  }
+  if (contextMessageId) {
+    body.context = { message_id: contextMessageId }
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+  const data = await response.json()
+  return { messageId: data.messages[0].id }
+}
+
 export interface SendTemplateMessageArgs {
   phoneNumberId: string
   accessToken: string

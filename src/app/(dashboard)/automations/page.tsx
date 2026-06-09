@@ -20,6 +20,7 @@ import {
 
 import { createClient } from "@/lib/supabase/client"
 import type { Automation } from "@/types"
+import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -57,34 +58,153 @@ const TEMPLATE_ICON: Record<TemplateSlug, typeof Zap> = {
 
 export default function AutomationsPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [automations, setAutomations] = useState<Automation[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Automation | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   async function load() {
+    if (!user) return
     try {
       const supabase = createClient()
-      const { data, error: fetchErr } = await supabase
+      
+      // 1. Fetch normal database automations
+      const { data: dbData, error: fetchErr } = await supabase
         .from("automations")
         .select("*")
         .order("created_at", { ascending: false })
       if (fetchErr) throw fetchErr
-      setAutomations((data ?? []) as Automation[])
+
+      // 2. Fetch chatbot config
+      const { data: chatbotConfig } = await supabase
+        .from("message_templates")
+        .select("id, buttons")
+        .eq("user_id", user.id)
+        .eq("name", "__chatbot_config")
+        .maybeSingle()
+
+      const configButtons = (chatbotConfig?.buttons as any) || {}
+      const chatbotIsActive = configButtons.is_active !== false
+
+      // 3. Fetch lead count and latest lead timestamp
+      const { count: leadCount } = await supabase
+        .from("tower_leads")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      const { data: latestLead } = await supabase
+        .from("tower_leads")
+        .select("created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // 4. Construct virtual automation for chatbot
+      const virtualChatbot: Automation = {
+        id: "virtual-tower-chatbot",
+        user_id: user.id,
+        name: "Tower Installation Chatbot",
+        description: "Qualifies tower installation leads via automated WhatsApp conversation flow.",
+        trigger_type: "message_received" as any,
+        trigger_config: {} as any,
+        is_active: chatbotIsActive,
+        execution_count: leadCount || 0,
+        last_executed_at: latestLead?.created_at || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      setAutomations([virtualChatbot, ...((dbData ?? []) as Automation[])])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load automations")
     }
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    if (!authLoading && user) {
+      load()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    
+    const handleRefresh = () => load()
+    window.addEventListener('refresh-data', handleRefresh);
+    return () => {
+      window.removeEventListener('refresh-data', handleRefresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   async function toggleActive(a: Automation, next: boolean) {
     // Optimistic flip so the switch feels instant.
     setAutomations((prev) =>
       prev?.map((x) => (x.id === a.id ? { ...x, is_active: next } : x)) ?? prev,
     )
+
+    if (a.id === "virtual-tower-chatbot") {
+      try {
+        const supabase = createClient()
+        const { data: existing } = await supabase
+          .from("message_templates")
+          .select("*")
+          .eq("user_id", user?.id)
+          .eq("name", "__chatbot_config")
+          .maybeSingle()
+
+        const currentButtons = (existing?.buttons as any) || {}
+        const updatedButtons = { ...currentButtons, is_active: next }
+
+        if (existing) {
+          const { error } = await supabase
+            .from("message_templates")
+            .update({ buttons: updatedButtons as any })
+            .eq("id", existing.id)
+          if (error) throw error
+        } else {
+          const defaultPayload = {
+            is_active: next,
+            welcome_msg: `नमस्ते 😊\n\nक्या आपके पास खाली जमीन / प्लॉट है?\n\n4G/5G टावर इंस्टॉलेशन के लिए आवेदन आमंत्रित हैं।\n\nकृपया जवाब दें:\n✅ YES – अगर आपके पास जमीन है\n❌ NO – अगर नहीं है`,
+            ask_name_msg: `नमस्ते 😊\n\n4G / 5G डिजिटल टावर इंस्टॉलेशन आवेदन के लिए कृपया नीचे दी गई जानकारी एक-एक करके बताएं:\n\n1️⃣ आपका पूरा नाम (Full Name) क्या है?`,
+            ask_location_msg: `धन्यवाद।\n\n2️⃣ आपकी जमीन किस स्थान (शहर / गांव / जिला) पर है? कृपया स्थान का नाम लिखकर भेजें:`,
+            ask_state_msg: `3️⃣ आपकी जमीन किस राज्य (State) में है?`,
+            ask_pincode_msg: `4️⃣ आपके क्षेत्र का पिन कोड (PIN Code) क्या है?`,
+            ask_mobile_msg: `5️⃣ आपका संपर्क मोबाइल नंबर क्या है? \n\n(यदि आप इसी व्हाट्सएप नंबर का उपयोग करना चाहते हैं, तो "YES" लिखकर भेजें)`,
+            ask_size_msg: `6️⃣ आपकी जमीन का साइज (Land Size) क्या है? (जैसे: 1500 sq ft, 20x50, 1 बीघा, या 2 कट्ठा):`,
+            ask_ownership_msg: `7️⃣ क्या जमीन आपकी स्वयं की (खुद की) है? (हाँ / नहीं):`,
+            end_no_land_msg: `ठीक है 🙏\n\nकोई बात नहीं। अगर भविष्य में जमीन हो या किसी और को जरूरत हो, तो हमसे जरूर संपर्क करें।\n\nमोबाइल टावर स्थापना – आपकी सेवा में सदैव तत्पर।`,
+            end_no_terms_msg: `ठीक है 🙏\n\nआपके जवाब के लिए धन्यवाद。\n\nअगर भविष्य में आप इस अवसर का लाभ उठाना चाहें, तो हमसे जरूर संपर्क करें。\n\nमोबाइल टावर स्थापना – आपकी सेवा में हमेशा तत्पर. 😊`,
+            survey_msg: `मोबाइल टावर स्थापना संबंधी अपडेट\n\nप्रिय महोदय/महोदया,\n\nमोबाइल टावर स्थापना के अवसर में आपकी रुचि के लिए धन्यवाद।\n\nजैसा कि चर्चा हुई थी, हमने आपके विवरण को ऑनलाइन स्थान सर्वेक्षण के लिए हमारी सर्वेक्षण टीम को भेज दिया है। इसके आधार पर, हम पुष्टि करेंगे कि आपके क्षेत्र में टावर स्थापना की आवश्यकता है या नहीं。\n\n📍 यदि आपका स्थान स्वीकृत हो जाता है, तो आपको निम्नलिखित लाभ प्राप्त होंगे:\n\n✅ अग्रिम भुगतान: ₹70,00,000/- (स्थापना से पहले)\n\n✅ मासिक किराया: ₹60,000/-*\n   (₹30,000/- सीधे आपके खाते में जमा + ₹30,000/- EMI के रूप में समायोजित)\n\n✅ रोजगार का अवसर:\n   टावर रखरखाव अनुबंध के तहत परिवार के एक सदस्य को निश्चित मासिक वेतन पर नौकरी दी जाएगी。\n\n📝 आपके स्थान की स्वीकृति मिलने के बाद, आपको कल सुबह तक WhatsApp पर PDF स्वीकृति रिपोर्ट प्राप्त हो जाएगी SURVEY के बाद।\n\n📌 महत्वपूर्ण नोट:\nस्वीकृति मिलने पर, आपको ₹2,550 का एकमुश्त पंजीकरण शुल्क देना होगा, जिससे आपकी भागीदारी और बुकिंग की पुष्टि हो जाएगी\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👉 अगर आप इन शर्तों से सहमत हैं और आगे बात करना चाहते हैं, तो कृपया "YES" लिखकर भेजें (सहमत होने के लिए)।\n\n👉 अगर नहीं, तो "NO" लिखकर जवाब दें।\n\nसादर,\nMs. Meena Kumari\nग्राहक संबंध कार्यकारी\n📞 9217662196\nमोबाइल टावर स्थापना सेवाएं`,
+            payment_msg: `बहुत अच्छा! 🎉\n\nआपका स्थान हमारी सर्वेक्षण टीम द्वारा जांचा जाएगा。\n\n📋 पंजीकरण की प्रक्रिया:\n\n✅ पंजीकरण शुल्क: ₹2,550/-\n\nयह शुल्क आपकी बुकिंग और भागीदारी की पुष्टि के लिए आवश्यक है\n\nपंजीकरण शुल्क जमा करने के बाद ही आगे की प्रक्रिया (जैसे NOC और एग्रीमेंट) शुरू होगी। QR कोड / Payment Details आपको जल्द ही भेजी जाएंगी।\n\nकृपया थोड़ा इंतजार करें। 🙏`
+          }
+
+          const { error } = await supabase
+            .from("message_templates")
+            .insert({
+              user_id: user?.id,
+              name: "__chatbot_config",
+              category: "Utility",
+              language: "en_US",
+              body_text: "WhatsApp Chatbot Configuration Payload",
+              buttons: defaultPayload as any,
+              status: "Approved",
+            })
+          if (error) throw error
+        }
+        toast.success(next ? "Tower Chatbot activated" : "Tower Chatbot paused")
+      } catch (err) {
+        setAutomations((prev) =>
+          prev?.map((x) => (x.id === a.id ? { ...x, is_active: !next } : x)) ?? prev,
+        )
+        toast.error("Failed to update chatbot status")
+      }
+      return
+    }
+
     const res = await fetch(`/api/automations/${a.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -213,9 +333,21 @@ export default function AutomationsPage() {
               key={a.id}
               automation={a}
               onToggle={(next) => toggleActive(a, next)}
-              onEdit={() => router.push(`/automations/${a.id}/edit`)}
+              onEdit={() => {
+                if (a.id === "virtual-tower-chatbot") {
+                  router.push("/settings?tab=chatbot")
+                } else {
+                  router.push(`/automations/${a.id}/edit`)
+                }
+              }}
               onDuplicate={() => duplicate(a)}
-              onLogs={() => router.push(`/automations/${a.id}/logs`)}
+              onLogs={() => {
+                if (a.id === "virtual-tower-chatbot") {
+                  router.push("/leads")
+                } else {
+                  router.push(`/automations/${a.id}/logs`)
+                }
+              }}
               onDelete={() => setPendingDelete(a)}
             />
           ))}
@@ -270,7 +402,11 @@ function AutomationCard({
   onLogs: () => void
   onDelete: () => void
 }) {
-  const meta = triggerMeta(automation.trigger_type)
+  const isVirtualChatbot = automation.id === "virtual-tower-chatbot"
+  const meta = isVirtualChatbot
+    ? { label: "Lead Qualification", pillClass: "border-primary/30 bg-primary/10 text-primary" }
+    : triggerMeta(automation.trigger_type)
+
   return (
     <li className="rounded-xl border border-slate-800 bg-slate-900 transition-colors hover:border-slate-700">
       <div className="flex items-center gap-4 p-4">
@@ -310,7 +446,7 @@ function AutomationCard({
               {meta.label}
             </span>
             <span className="tabular-nums">
-              {automation.execution_count} run{automation.execution_count === 1 ? "" : "s"}
+              {automation.execution_count} {isVirtualChatbot ? "lead" : "run"}{automation.execution_count === 1 ? "" : "s"}
             </span>
             <span aria-hidden>·</span>
             <span>last {formatRelative(automation.last_executed_at)}</span>
@@ -336,19 +472,28 @@ function AutomationCard({
                 <Pencil className="h-4 w-4" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDuplicate}>
-                <Copy className="h-4 w-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onLogs}>
-                <FileText className="h-4 w-4" />
-                View Logs
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
+              {!isVirtualChatbot ? (
+                <>
+                  <DropdownMenuItem onClick={onDuplicate}>
+                    <Copy className="h-4 w-4" />
+                    Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onLogs}>
+                    <FileText className="h-4 w-4" />
+                    View Logs
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onClick={onDelete}>
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem onClick={onLogs}>
+                  <FileText className="h-4 w-4" />
+                  View Leads
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

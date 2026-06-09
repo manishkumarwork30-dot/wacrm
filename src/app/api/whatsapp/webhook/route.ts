@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
-import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
+import { getMediaUrl, downloadMedia, sendTextMessage } from '@/lib/whatsapp/meta-api'
 import { normalizePhone, phonesMatch } from '@/lib/whatsapp/phone-utils'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
+import { processChatbot } from '@/lib/whatsapp/chatbot'
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +68,14 @@ interface WhatsAppWebhookEntry {
         status: string
         timestamp: string
         recipient_id: string
+        errors?: Array<{
+          code: number
+          title: string
+          message?: string
+          error_data?: {
+            details?: string
+          }
+        }>
       }>
     }
     field: string
@@ -177,10 +186,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  // Process asynchronously so we can ack Meta within their timeout.
-  processWebhook(body).catch((error) => {
+  // Process webhook and wait for it to complete in serverless environment
+  try {
+    await processWebhook(body)
+  } catch (error) {
     console.error('Error processing webhook:', error)
-  })
+  }
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
 }
@@ -251,7 +262,8 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
           message,
           contact,
           config.user_id,
-          decryptedAccessToken
+          decryptedAccessToken,
+          phoneNumberId
         )
       }
     }
@@ -305,6 +317,14 @@ async function handleStatusUpdate(status: {
   status: string
   timestamp: string
   recipient_id: string
+  errors?: Array<{
+    code: number
+    title: string
+    message?: string
+    error_data?: {
+      details?: string
+    }
+  }>
 }) {
   // 1) Mirror onto messages (legacy behavior) — Meta's status values
   //    already match the CHECK constraint on messages.status.
@@ -320,7 +340,7 @@ async function handleStatusUpdate(status: {
   // 2) Mirror onto broadcast_recipients via whatsapp_message_id
   //    (added in migration 003). The aggregate trigger on
   //    broadcast_recipients re-derives the parent broadcast's
-  //    sent/delivered/read/failed counts automatically.
+  //    sent/delivered/read/replied/failed counts automatically.
   const tsIso = new Date(parseInt(status.timestamp) * 1000).toISOString()
 
   const { data: recipient, error: recFetchErr } = await supabaseAdmin()
@@ -343,6 +363,18 @@ async function handleStatusUpdate(status: {
   if (status.status === 'sent' && !('sent_at' in update)) update.sent_at = tsIso
   if (status.status === 'delivered') update.delivered_at = tsIso
   if (status.status === 'read') update.read_at = tsIso
+
+  if (status.status === 'failed') {
+    let errorMsg = 'Delivery failed'
+    if (status.errors && status.errors.length > 0) {
+      const err = status.errors[0]
+      errorMsg = err.message || err.title || `Error code ${err.code}`
+      if (err.error_data?.details) {
+        errorMsg += `: ${err.error_data.details}`
+      }
+    }
+    update.error_message = errorMsg
+  }
 
   const { error: recUpdateErr } = await supabaseAdmin()
     .from('broadcast_recipients')
@@ -475,7 +507,8 @@ async function processMessage(
   message: WhatsAppMessage,
   contact: { profile: { name: string }; wa_id: string },
   userId: string,
-  accessToken: string
+  accessToken: string,
+  phoneNumberId: string
 ) {
   const senderPhone = normalizePhone(message.from)
   const contactName = contact.profile.name
@@ -495,6 +528,33 @@ async function processMessage(
     contactRecord.id
   )
   if (!conversation) return
+
+  // Ensure contact has a lead record in tower_leads so they show up on the leads dashboard immediately
+  try {
+    const { data: existingLead } = await supabaseAdmin()
+      .from('tower_leads')
+      .select('id')
+      .eq('contact_id', contactRecord.id)
+      .maybeSingle()
+
+    if (!existingLead) {
+      const { error: insLeadErr } = await supabaseAdmin()
+        .from('tower_leads')
+        .insert({
+          user_id: userId,
+          contact_id: contactRecord.id,
+          name: contactRecord.name || contactName || senderPhone,
+          mobile_no: senderPhone,
+          location: 'Pending Chatbot',
+          status: 'Pending'
+        })
+      if (insLeadErr) {
+        console.error('[webhook] Failed to auto-create tower lead:', insLeadErr.message)
+      }
+    }
+  } catch (leadCheckErr) {
+    console.error('[webhook] Error in tower_leads check/creation:', leadCheckErr)
+  }
 
   // Reactions short-circuit here — they aren't messages. We never insert
   // into `messages`, never bump unread_count, never update last_message_text.
@@ -601,44 +661,48 @@ async function processMessage(
   await flagBroadcastReplyIfAny(userId, contactRecord.id)
 
   // ============================================================
-  // Flow runner dispatch.
-  //
-  // If the runner consumes the message (it either advanced an active
-  // run or started a new one), we suppress the `new_message_received`
-  // + `keyword_match` automation triggers for this inbound. Customer
-  // is navigating the bot menu, not sending a fresh trigger word
-  // that should fork into automations.
-  //
-  // The relationship-level triggers (`new_contact_created`,
-  // `first_inbound_message`) still fire even when consumed — those
-  // are about WHO is messaging, not what they said.
-  //
-  // Awaited (not fire-and-forget) because we need the `consumed`
-  // result before deciding whether to dispatch automations. The
-  // runner has its own try/catch and never throws. Accounts with
-  // no active flows take the runner's early-exit "no_match" path
-  // basically for free (one indexed SELECT for the active run).
+  // Advanced Chatbot Integration.
   // ============================================================
-  const flowResult = await dispatchInboundToFlows({
+  const chatbotConsumed = await processChatbot({
     userId,
     contactId: contactRecord.id,
     conversationId: conversation.id,
-    message:
-      interactiveReplyId
-        ? {
-            kind: 'interactive_reply',
-            reply_id: interactiveReplyId,
-            reply_title: contentText ?? '',
-            meta_message_id: message.id,
-          }
-        : {
-            kind: 'text',
-            text: contentText ?? message.text?.body ?? '',
-            meta_message_id: message.id,
-          },
-    isFirstInboundMessage,
+    senderPhone,
+    messageText: contentText ?? message.text?.body ?? '',
+    phoneNumberId,
+    accessToken,
+  }).catch((err) => {
+    console.error('[chatbot] error processing chatbot:', err)
+    return false
   })
-  const flowConsumed = flowResult.consumed
+
+  let flowConsumed = chatbotConsumed
+
+  if (!chatbotConsumed) {
+    // ============================================================
+    // Flow runner dispatch.
+    // ============================================================
+    const flowResult = await dispatchInboundToFlows({
+      userId,
+      contactId: contactRecord.id,
+      conversationId: conversation.id,
+      message:
+        interactiveReplyId
+          ? {
+              kind: 'interactive_reply',
+              reply_id: interactiveReplyId,
+              reply_title: contentText ?? '',
+              meta_message_id: message.id,
+            }
+          : {
+              kind: 'text',
+              text: contentText ?? message.text?.body ?? '',
+              meta_message_id: message.id,
+            },
+      isFirstInboundMessage,
+    })
+    flowConsumed = flowResult.consumed
+  }
 
   // Fire any automations that react to this webhook event. All dispatches
   // run here (not earlier) so the contact, conversation, and inbound
@@ -656,6 +720,8 @@ async function processMessage(
   // message — see the comment block above.
   if (!flowConsumed) {
     automationTriggers.push('new_message_received', 'keyword_match')
+    
+    // --- AUTO-CHATS BOT INTEGRATION REMOVED ---
   }
   // new_contact_created fires only when the webhook just auto-created the
   // contact row. first_inbound_message fires whenever this is the contact's

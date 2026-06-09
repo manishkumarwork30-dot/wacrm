@@ -229,6 +229,7 @@ export async function POST(request: Request) {
           status: 'connected',
           connected_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          display_phone_number: phoneInfo?.display_phone_number ?? null,
         })
         .eq('user_id', user.id)
 
@@ -250,6 +251,7 @@ export async function POST(request: Request) {
           verify_token: encryptedVerifyToken,
           status: 'connected',
           connected_at: new Date().toISOString(),
+          display_phone_number: phoneInfo?.display_phone_number ?? null,
         })
 
       if (insertError) {

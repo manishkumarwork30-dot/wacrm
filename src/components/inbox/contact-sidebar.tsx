@@ -14,22 +14,53 @@ import {
   DollarSign,
   StickyNote,
   Plus,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface ContactSidebarProps {
   contact: Contact | null;
+  onDeleted?: () => void;
 }
 
-export function ContactSidebar({ contact }: ContactSidebarProps) {
+export function ContactSidebar({ contact, onDeleted }: ContactSidebarProps) {
   const [copied, setCopied] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [tags, setTags] = useState<(Tag & { contact_tag_id: string })[]>([]);
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteContact = useCallback(async () => {
+    if (!contact) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${contact.name || contact.phone}? This will also delete all active conversations and messages for this contact.`
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("contacts")
+      .delete()
+      .eq("id", contact.id);
+
+    if (error) {
+      toast.error("Failed to delete contact");
+    } else {
+      toast.success("Contact deleted successfully");
+      if (onDeleted) onDeleted();
+    }
+    setDeleting(false);
+  }, [contact, onDeleted]);
 
   const fetchContactData = useCallback(async () => {
     if (!contact) return;
@@ -288,6 +319,24 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
               </div>
             </div>
           </div>
+
+          {/* Divider */}
+          <div className="my-4 border-t border-slate-800" />
+
+          {/* Delete Contact Button */}
+          <Button
+            variant="destructive"
+            onClick={handleDeleteContact}
+            disabled={deleting}
+            className="w-full text-xs"
+          >
+            {deleting ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+            )}
+            Delete Contact
+          </Button>
         </div>
       </ScrollArea>
     </div>

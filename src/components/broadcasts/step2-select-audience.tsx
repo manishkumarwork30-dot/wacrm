@@ -65,8 +65,8 @@ const audienceOptions: {
   },
   {
     type: 'csv',
-    label: 'Upload CSV',
-    description: 'Upload a list of phone numbers',
+    label: 'Phone Numbers / Excel / CSV',
+    description: 'Type, paste or upload Excel/CSV numbers',
     icon: Upload,
   },
 ];
@@ -89,6 +89,143 @@ export function Step2SelectAudience({
   const [loadingFields, setLoadingFields] = useState(false);
   const [estimatedCount, setEstimatedCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
+  
+  const [contactsGrid, setContactsGrid] = useState<{ id: string; phone: string; name: string }[]>([
+    { id: '1', phone: '', name: '' },
+    { id: '2', phone: '', name: '' },
+    { id: '3', phone: '', name: '' },
+  ]);
+  const [fileName, setFileName] = useState('');
+  const [bulkText, setBulkText] = useState('');
+  const [showBulkInput, setShowBulkInput] = useState(false);
+
+  // Sync contactsGrid with incoming audience.csvContacts on mount / select
+  useEffect(() => {
+    if (audience.type === 'csv' && audience.csvContacts && audience.csvContacts.length > 0) {
+      const activeContacts = contactsGrid.filter((r) => r.phone.trim() !== '');
+      if (activeContacts.length === 0) {
+        const gridRows = audience.csvContacts.map((c, i) => ({
+          id: String(i + 1),
+          phone: c.phone,
+          name: c.name || '',
+        }));
+        gridRows.push({ id: `ext-1-${Date.now()}`, phone: '', name: '' });
+        gridRows.push({ id: `ext-2-${Date.now()}`, phone: '', name: '' });
+        setContactsGrid(gridRows);
+      }
+    }
+  }, [audience.type, audience.csvContacts]);
+
+  const parseNumbersText = (text: string) => {
+    const parts = text.split(/[\n,;\s]+/);
+    const contacts: { phone: string; name?: string }[] = [];
+    const seen = new Set<string>();
+
+    for (const part of parts) {
+      let clean = part.trim();
+      const hasPlus = clean.startsWith('+');
+      clean = clean.replace(/\D/g, '');
+      if (hasPlus) clean = '+' + clean;
+
+      const digitCount = clean.replace(/\D/g, '').length;
+      if (digitCount >= 8 && !seen.has(clean)) {
+        seen.add(clean);
+        contacts.push({ phone: clean });
+      }
+    }
+    return contacts;
+  };
+
+  const propagateGridContacts = (gridRows: { phone: string; name: string }[]) => {
+    const validContacts: { phone: string; name?: string }[] = [];
+    for (const r of gridRows) {
+      let clean = r.phone.trim();
+      if (!clean) continue;
+      const hasPlus = clean.startsWith('+');
+      clean = clean.replace(/\D/g, '');
+      if (hasPlus) clean = '+' + clean;
+
+      if (clean.replace(/\D/g, '').length >= 8) {
+        validContacts.push({
+          phone: clean,
+          name: r.name.trim() || undefined,
+        });
+      }
+    }
+
+    onUpdate({
+      ...audience,
+      csvContacts: validContacts,
+    });
+  };
+
+  const updateGridRow = (id: string, field: 'phone' | 'name', val: string) => {
+    const updated = contactsGrid.map((row) => {
+      if (row.id === id) {
+        return { ...row, [field]: val };
+      }
+      return row;
+    });
+
+    const lastRow = updated[updated.length - 1];
+    if (lastRow.id === id && val.trim() !== '') {
+      updated.push({ id: `ext-${Date.now()}`, phone: '', name: '' });
+    }
+
+    setContactsGrid(updated);
+    propagateGridContacts(updated);
+  };
+
+  const deleteGridRow = (id: string) => {
+    let updated = contactsGrid.filter((row) => row.id !== id);
+    if (updated.length === 0) {
+      updated = [{ id: `1-${Date.now()}`, phone: '', name: '' }];
+    }
+    setContactsGrid(updated);
+    propagateGridContacts(updated);
+  };
+
+  const addGridRow = () => {
+    setContactsGrid([...contactsGrid, { id: `ext-${Date.now()}`, phone: '', name: '' }]);
+  };
+
+  const handleBulkImport = () => {
+    if (!bulkText.trim()) return;
+    const parsed = parseNumbersText(bulkText);
+    const newRows = parsed.map((c, i) => ({
+      id: `bulk-${i}-${Date.now()}`,
+      phone: c.phone,
+      name: c.name || '',
+    }));
+    newRows.push({ id: `ext-${Date.now()}`, phone: '', name: '' });
+    setContactsGrid(newRows);
+    propagateGridContacts(newRows);
+    setBulkText('');
+    setShowBulkInput(false);
+  };
+
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const parsed = parseNumbersText(text);
+      const newRows = parsed.map((c, i) => ({
+        id: `csv-${i}-${Date.now()}`,
+        phone: c.phone,
+        name: c.name || '',
+      }));
+      newRows.push({ id: `ext-${Date.now()}`, phone: '', name: '' });
+      setContactsGrid(newRows);
+      propagateGridContacts(newRows);
+    };
+    reader.readAsText(file);
+  };
 
   // Tags are used both by the primary "Filter by Tags" audience type
   // AND by the exclude-list below — so always load once on mount.
@@ -386,6 +523,141 @@ export function Step2SelectAudience({
               />
             </div>
           )}
+        </div>
+      )}
+
+      {audience.type === 'csv' && (
+        <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-white">Recipient Grid (Excel-like)</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Type directly into the rows, paste numbers in bulk, or upload a CSV file.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkInput(!showBulkInput)}
+                className="h-8 border-slate-700 bg-slate-800 text-xs text-slate-300 hover:bg-slate-700 hover:text-white"
+              >
+                {showBulkInput ? 'Hide Bulk Paste' : 'Bulk Paste'}
+              </Button>
+              <input
+                type="file"
+                accept=".csv,.txt"
+                onChange={handleCsvUpload}
+                className="hidden"
+                id="csv-upload-input"
+              />
+              <label
+                htmlFor="csv-upload-input"
+                className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Upload CSV
+              </label>
+            </div>
+          </div>
+
+          {fileName && (
+            <p className="text-xs text-emerald-400 font-medium">
+              Loaded from file: {fileName}
+            </p>
+          )}
+
+          {showBulkInput && (
+            <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p className="text-xs font-semibold text-white">Paste a list of numbers below:</p>
+              <textarea
+                placeholder="Paste numbers (e.g. 919355173649, 919876543210 or line by line)"
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                rows={3}
+                className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs text-white placeholder-slate-500 outline-none focus:border-primary"
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowBulkInput(false)}
+                  className="h-7 text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleBulkImport}
+                  className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Import
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Grid Table */}
+          <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="sticky top-0 bg-slate-900 text-[10px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800 z-10">
+                <tr>
+                  <th className="px-3 py-2 w-10 text-center">#</th>
+                  <th className="px-3 py-2">Phone Number</th>
+                  <th className="px-3 py-2">Name (Optional)</th>
+                  <th className="px-3 py-2 w-10 text-center"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {contactsGrid.map((row, index) => (
+                  <tr key={row.id} className="hover:bg-slate-800/20">
+                    <td className="px-3 py-1.5 text-slate-500 font-mono text-center">{index + 1}</td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        type="text"
+                        value={row.phone}
+                        onChange={(e) => updateGridRow(row.id, 'phone', e.target.value)}
+                        placeholder="e.g. 919355173649"
+                        className="w-full bg-transparent outline-none border-b border-transparent focus:border-primary/50 py-0.5 text-white placeholder-slate-700"
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => updateGridRow(row.id, 'name', e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className="w-full bg-transparent outline-none border-b border-transparent focus:border-primary/50 py-0.5 text-white placeholder-slate-700"
+                      />
+                    </td>
+                    <td className="px-3 py-1.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => deleteGridRow(row.id)}
+                        className="text-slate-500 hover:text-red-400 transition-colors p-1"
+                        title="Delete row"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-between items-center text-xs">
+            <button
+              type="button"
+              onClick={addGridRow}
+              className="text-primary hover:text-primary/80 font-medium"
+            >
+              + Add Row
+            </button>
+            <span className="text-slate-500 font-medium">
+              Valid: {audience.csvContacts?.length ?? 0} recipients
+            </span>
+          </div>
         </div>
       )}
 

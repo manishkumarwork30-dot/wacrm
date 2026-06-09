@@ -33,6 +33,7 @@ import {
   Search,
   Plus,
   Upload,
+  Sparkles,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -70,6 +71,7 @@ export default function ContactsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   // All tags for display
   const [tagsMap, setTagsMap] = useState<Record<string, Tag>>({});
@@ -152,6 +154,11 @@ export default function ContactsPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchContacts();
+
+    window.addEventListener('refresh-data', fetchContacts);
+    return () => {
+      window.removeEventListener('refresh-data', fetchContacts);
+    };
   }, [fetchContacts]);
 
   function openAddForm() {
@@ -201,6 +208,25 @@ export default function ContactsPage() {
     setDeleteTarget(null);
   }
 
+  async function handleSeedContacts() {
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/contacts/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: 25 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Seed failed');
+      toast.success(`✅ Added ${data.inserted} random Indian contacts!`);
+      fetchContacts();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to seed contacts');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasNext = page < totalPages - 1;
   const hasPrev = page > 0;
@@ -216,6 +242,20 @@ export default function ContactsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSeedContacts}
+            disabled={seeding}
+            title="Add 25 random Indian contacts for testing"
+            className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+          >
+            {seeding ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            {seeding ? 'Adding...' : 'Seed Test Contacts'}
+          </Button>
           <Button
             variant="outline"
             onClick={() => setImportOpen(true)}

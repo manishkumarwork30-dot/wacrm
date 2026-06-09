@@ -21,6 +21,9 @@ import {
   Clock,
   ArrowLeft,
   RefreshCw,
+  Zap,
+  Play,
+  Loader2,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -173,6 +176,86 @@ export function MessageThread({
     }, 700);
   }, [isRefreshing, onRefresh]);
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
+  const [dbAutomations, setDbAutomations] = useState<{ id: string; name: string }[]>([]);
+  const [runningAutomation, setRunningAutomation] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from("automations")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name")
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Failed to fetch active automations:", error);
+          return;
+        }
+        setDbAutomations(data || []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const handleTriggerChatbot = useCallback(async () => {
+    if (!contact || !conversation) return;
+    setRunningAutomation(true);
+    try {
+      const res = await fetch("/api/chatbot/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          conversation_id: conversation.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      toast.success("Tower qualification chatbot started successfully!");
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error("Failed to start chatbot:", err);
+      toast.error(`Failed to start chatbot: ${err.message}`);
+    } finally {
+      setRunningAutomation(false);
+    }
+  }, [contact, conversation, onRefresh]);
+
+  const handleRunAutomation = useCallback(async (automationId: string, name: string) => {
+    if (!contact) return;
+    setRunningAutomation(true);
+    try {
+      const res = await fetch("/api/automations/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          automation_id: automationId,
+          contact_id: contact.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      toast.success(`Automation "${name}" executed successfully!`);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error("Failed to execute automation:", err);
+      toast.error(`Failed to execute automation: ${err.message}`);
+    } finally {
+      setRunningAutomation(false);
+    }
+  }, [contact, onRefresh]);
 
   // Profiles are bounded by RLS to rows the current user is allowed to
   // see — today that's just the current user, but the dropdown keeps the
@@ -704,7 +787,7 @@ export function MessageThread({
     : "Assign";
 
   return (
-    <div className={cn("flex flex-1 flex-col", DOODLE_BG_CLASSES)}>
+    <div className={cn("flex flex-1 flex-col h-full min-h-0 overflow-hidden", DOODLE_BG_CLASSES)}>
       {/* Header — solid bg-slate-900 sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900 px-3 py-3 sm:px-4">
@@ -840,6 +923,56 @@ export function MessageThread({
                   >
                     Unassign
                   </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Run Automation dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={runningAutomation}
+              className={cn(
+                "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-slate-800 text-slate-400",
+                runningAutomation && "opacity-60"
+              )}
+            >
+              {runningAutomation ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Zap className="h-3 w-3" />
+              )}
+              <span className="hidden sm:inline">Run Automation</span>
+              <ChevronDown className="h-3 w-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="border-slate-700 bg-slate-800"
+            >
+              <DropdownMenuItem
+                onClick={handleTriggerChatbot}
+                className="text-sm text-slate-300 hover:text-white"
+              >
+                <Play className="mr-2 h-3.5 w-3.5 text-primary text-emerald-400" />
+                Start Tower Chatbot
+              </DropdownMenuItem>
+              
+              {dbAutomations.length > 0 && (
+                <>
+                  <DropdownMenuSeparator className="bg-slate-700" />
+                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">
+                    Active Workflows
+                  </div>
+                  {dbAutomations.map((aut) => (
+                    <DropdownMenuItem
+                      key={aut.id}
+                      onClick={() => handleRunAutomation(aut.id, aut.name)}
+                      className="text-sm text-slate-300 hover:text-white"
+                    >
+                      <Zap className="mr-2 h-3.5 w-3.5 text-amber-400" />
+                      {aut.name}
+                    </DropdownMenuItem>
+                  ))}
                 </>
               )}
             </DropdownMenuContent>

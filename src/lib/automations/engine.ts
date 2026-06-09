@@ -16,6 +16,8 @@ import type {
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate } from './meta-send'
+import { generateCongratulationsDoc } from '@/lib/document-generator'
+import { sendDocumentMessage } from '@/lib/whatsapp/meta-api'
 
 // ------------------------------------------------------------
 // Public API
@@ -75,6 +77,30 @@ export async function runAutomationsForTrigger(input: DispatchInput): Promise<vo
   } catch (err) {
     console.error('[automations] dispatch failed:', err)
   }
+}
+
+/**
+ * Manually execute a specific automation by ID for a contact.
+ */
+export async function runSpecificAutomation(automationId: string, userId: string, contactId: string): Promise<void> {
+  const db = supabaseAdmin()
+  const { data: automation, error } = await db
+    .from('automations')
+    .select('*')
+    .eq('id', automationId)
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !automation) {
+    throw new Error(error?.message || 'Automation not found or access denied')
+  }
+
+  await executeAutomation(automation as Automation, {
+    userId,
+    triggerType: 'manual' as any,
+    contactId,
+    context: {}
+  })
 }
 
 /**
@@ -441,6 +467,57 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         .eq('user_id', args.automation.user_id)
         .eq('contact_id', args.contactId)
       return 'conversation closed'
+    }
+
+    case 'send_tower_document': {
+      const cfg = step.step_config as SendTowerDocumentStepConfig
+      if (!args.contactId) throw new Error('send_tower_document needs a contact')
+      
+      // Get lead details
+      const { data: lead } = await db.from('tower_leads').select('*').eq('contact_id', args.contactId).maybeSingle();
+      if (!lead) throw new Error('No tower_lead found for this contact');
+
+      // Get WA account
+      const { data: accounts } = await db.from('whatsapp_accounts').select('*').eq('user_id', args.automation.user_id).limit(1);
+      const waAccount = accounts?.[0];
+      if (!waAccount) throw new Error('No WA account found');
+
+      // Generate document
+      const pdfBytes = await generateCongratulationsDoc(lead.name || 'User', lead.location || 'Your Location');
+      const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
+
+      // Upload to storage
+      const { data: uploadData, error: uploadError } = await db.storage
+        .from('documents')
+        .upload(`welcomes/${lead.id}-${Date.now()}.pdf`, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+
+      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+      // Get public URL
+      const { data: publicUrlData } = db.storage.from('documents').getPublicUrl(uploadData.path);
+      
+      // Get mobile number from contact
+      const { data: contact } = await db.from('contacts').select('phone').eq('id', args.contactId).single();
+      if (!contact?.phone) throw new Error('Contact has no phone number');
+
+      const caption = interpolate(cfg.caption || `Congratulations ${lead.name}!`, args);
+
+      await sendDocumentMessage({
+        phoneNumberId: waAccount.phone_number_id,
+        accessToken: waAccount.access_token,
+        to: contact.phone,
+        documentUrl: publicUrlData.publicUrl,
+        filename,
+        caption
+      });
+
+      // Update lead status
+      await db.from('tower_leads').update({ status: 'Approval Sent', updated_at: new Date().toISOString() }).eq('id', lead.id);
+
+      return 'tower document sent';
     }
 
     default:

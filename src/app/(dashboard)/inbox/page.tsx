@@ -39,6 +39,16 @@ export default function InboxPage() {
    */
   const [resyncToken, setResyncToken] = useState(0);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      setResyncToken((t) => t + 1);
+    };
+    window.addEventListener("refresh-data", handleRefresh);
+    return () => {
+      window.removeEventListener("refresh-data", handleRefresh);
+    };
+  }, []);
+
   // Fire the deep-link auto-select exactly once per URL — subsequent
   // list refreshes (realtime, manual refetch) must not snap the user
   // back to the deep-linked conversation if they've already clicked
@@ -209,6 +219,19 @@ export default function InboxPage() {
     [activeConversation, hydrateConversation]
   );
 
+  // Mobile "back" — deselect the conversation so the list pane comes
+  // back. Also clears the ?c= param so a refresh lands on the list
+  // instead of re-opening the thread the user just backed out of.
+  const handleCloseConversation = useCallback(() => {
+    setActiveConversation(null);
+    setActiveContact(null);
+    setMessages([]);
+    // Clearing the ref lets the deep-link auto-selector fire again if
+    // the user later visits /inbox?c=<same-id> — desirable UX.
+    autoSelectedForDeepLinkRef.current = null;
+    router.replace("/inbox", { scroll: false });
+  }, [router]);
+
   // Handle realtime conversation events
   const handleConversationEvent = useCallback(
     (event: {
@@ -216,6 +239,17 @@ export default function InboxPage() {
       new: Conversation;
       old: Partial<Conversation>;
     }) => {
+      if (event.eventType === "DELETE") {
+        const deletedId = event.old.id;
+        if (deletedId) {
+          setConversations((prev) => prev.filter((c) => c.id !== deletedId));
+          if (activeConversation?.id === deletedId) {
+            handleCloseConversation();
+          }
+        }
+        return;
+      }
+
       const conv = event.new;
 
       if (event.eventType === "INSERT") {
@@ -268,7 +302,7 @@ export default function InboxPage() {
         }
       }
     },
-    [activeConversation, hydrateConversation]
+    [activeConversation, hydrateConversation, handleCloseConversation]
   );
 
   // Subscribe to realtime. The `isConnected` flag below feeds the
@@ -422,18 +456,7 @@ export default function InboxPage() {
     [activeConversation?.id, router]
   );
 
-  // Mobile "back" — deselect the conversation so the list pane comes
-  // back. Also clears the ?c= param so a refresh lands on the list
-  // instead of re-opening the thread the user just backed out of.
-  const handleCloseConversation = useCallback(() => {
-    setActiveConversation(null);
-    setActiveContact(null);
-    setMessages([]);
-    // Clearing the ref lets the deep-link auto-selector fire again if
-    // the user later visits /inbox?c=<same-id> — desirable UX.
-    autoSelectedForDeepLinkRef.current = null;
-    router.replace("/inbox", { scroll: false });
-  }, [router]);
+
 
 
   const handleMessagesLoaded = useCallback((loaded: Message[]) => {
@@ -496,7 +519,7 @@ export default function InboxPage() {
   const hasActiveConv = !!activeConversation;
 
   return (
-    <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-m-6">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       {/* WhatsApp connection banner — in the flex column, not absolute,
           so it pushes the panels down instead of overlapping them. */}
       {whatsappConnected === false && (
@@ -514,7 +537,7 @@ export default function InboxPage() {
             thread can occupy the full width. Always visible on lg+. */}
         <div
           className={cn(
-            "flex h-full flex-1 lg:flex-none",
+            "flex h-full flex-1 lg:flex-none min-h-0 overflow-hidden",
             hasActiveConv ? "hidden lg:flex" : "flex",
           )}
         >
@@ -533,7 +556,7 @@ export default function InboxPage() {
             (shows its own empty-state if no thread is picked yet). */}
         <div
           className={cn(
-            "flex h-full flex-1 lg:flex",
+            "flex h-full flex-1 lg:flex min-h-0 overflow-hidden",
             hasActiveConv ? "flex" : "hidden lg:flex",
           )}
         >
@@ -554,7 +577,7 @@ export default function InboxPage() {
 
         {/* Right panel: Contact sidebar — desktop only. */}
         <div className="hidden lg:block">
-          <ContactSidebar contact={activeContact} />
+          <ContactSidebar contact={activeContact} onDeleted={handleCloseConversation} />
         </div>
       </div>
     </div>

@@ -95,6 +95,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadAll()
+
+    window.addEventListener('refresh-data', loadAll);
+    return () => {
+      window.removeEventListener('refresh-data', loadAll);
+    };
   }, [loadAll])
 
   // Range switch handler — kept in an event callback (not an effect)
