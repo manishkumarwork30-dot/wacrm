@@ -22,9 +22,20 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  UserCheck
+  UserCheck,
+  Send,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface Lead {
   id: string;
@@ -45,6 +56,14 @@ export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showGuide, setShowGuide] = useState(false);
+  
+  // Modal State for Manual Send Approval
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -158,6 +177,52 @@ export default function LeadsPage() {
         return <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-1 text-xs font-medium text-red-400 border border-red-500/20"><XCircle className="size-3" /> Not Interested</span>;
       default:
         return <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-1 text-xs font-medium text-slate-400 border border-slate-500/20">{status}</span>;
+    }
+  };
+
+  const handleSendApprovalClick = (lead: Lead) => {
+    setSelectedLead(lead);
+    setEditName(lead.name || "");
+    setEditLocation(lead.location || "");
+    setIsModalOpen(true);
+  };
+
+  const submitSendApproval = async () => {
+    if (!selectedLead) return;
+    if (!editName.trim() || !editLocation.trim()) {
+      toast.error("Name and Location are required to generate the PDF.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const response = await fetch(`/api/leads/${selectedLead.id}/send-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName, location: editLocation }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send approval');
+      }
+      
+      toast.success("Approval PDF sent successfully!");
+      setIsModalOpen(false);
+      
+      // Update local state to reflect the change
+      setLeads(leads.map(l => {
+        if (l.id === selectedLead.id) {
+          return { ...l, name: editName, location: editLocation, status: 'Approval Sent' };
+        }
+        return l;
+      }));
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to send approval");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -355,6 +420,7 @@ export default function LeadsPage() {
                     <th className="px-6 py-4">Ownership</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-right">Date & Time</th>
+                    <th className="px-6 py-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
@@ -371,6 +437,18 @@ export default function LeadsPage() {
                       <td className="px-6 py-4 text-right text-slate-400">
                         {new Date(l.created_at).toLocaleString("en-IN")}
                       </td>
+                      <td className="px-6 py-4 text-center">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleSendApprovalClick(l)}
+                          className="border-primary/20 hover:bg-primary hover:text-primary-foreground text-primary h-8"
+                          disabled={l.status === 'Approval Sent'}
+                        >
+                          <Send className="w-3 h-3 mr-1" />
+                          {l.status === 'Approval Sent' ? 'Sent' : 'Send Approval'}
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -379,6 +457,60 @@ export default function LeadsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Missing Details / Confirmation Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-slate-950 border-slate-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Send Approval PDF</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {(!selectedLead?.name || !selectedLead?.location) 
+                ? "This lead is missing some details. Please provide them to generate the PDF." 
+                : "Confirm the details below before generating and sending the approval PDF."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name" className="text-slate-300">Name on Document</Label>
+              <Input
+                id="name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Applicant Name"
+                className="bg-slate-900 border-slate-800 text-white"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="location" className="text-slate-300">Location / District</Label>
+              <Input
+                id="location"
+                value={editLocation}
+                onChange={(e) => setEditLocation(e.target.value)}
+                placeholder="District or Location"
+                className="bg-slate-900 border-slate-800 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsModalOpen(false)}
+              className="border-slate-800 bg-transparent hover:bg-slate-800 text-slate-300"
+              disabled={isSending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={submitSendApproval}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={isSending || !editName.trim() || !editLocation.trim()}
+            >
+              {isSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              {isSending ? "Sending..." : "Send PDF Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
