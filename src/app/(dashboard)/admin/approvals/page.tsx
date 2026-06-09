@@ -34,7 +34,6 @@ export default function ApprovalsPage() {
       const { data } = await supabase
         .from("tower_leads")
         .select("*, contacts(phone)")
-        .eq("status", "Approval Sent")
         .order("updated_at", { ascending: false });
 
       if (data) {
@@ -96,10 +95,10 @@ export default function ApprovalsPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Sent Approvals
+            Approvals Management
           </h1>
           <p className="text-sm text-slate-400">
-            Leads who have successfully received the final PDF approval document.
+            Manage and send final PDF approval documents to all your leads.
           </p>
         </div>
       </div>
@@ -112,6 +111,7 @@ export default function ApprovalsPage() {
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">District</th>
+                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Sent At</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
               </tr>
@@ -125,8 +125,8 @@ export default function ApprovalsPage() {
                 </tr>
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                    No approvals have been sent yet.
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                    No leads found.
                   </td>
                 </tr>
               ) : (
@@ -144,10 +144,17 @@ export default function ApprovalsPage() {
                     <td className="px-4 py-3 text-slate-400">
                       {lead.location || "N/A"}
                     </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        lead.status === 'Approval Sent' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'
+                      }`}>
+                        {lead.status === 'Approval Sent' ? 'Sent' : 'Pending'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-slate-400">
-                      {lead.updated_at
+                      {lead.status === 'Approval Sent' && lead.updated_at
                         ? format(new Date(lead.updated_at), "MMM d, yyyy h:mm a")
-                        : "Unknown"}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button 
@@ -157,7 +164,7 @@ export default function ApprovalsPage() {
                         className="border-primary/20 hover:bg-primary hover:text-primary-foreground text-primary h-8"
                       >
                         <Send className="w-3 h-3 mr-1" />
-                        Resend
+                        {lead.status === 'Approval Sent' ? 'Resend' : 'Send'}
                       </Button>
                     </td>
                   </tr>
@@ -172,9 +179,9 @@ export default function ApprovalsPage() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px] bg-slate-950 border-slate-800 text-white">
           <DialogHeader>
-            <DialogTitle>Resend Approval PDF</DialogTitle>
+            <DialogTitle>{selectedLead?.status === 'Approval Sent' ? 'Resend' : 'Send'} Approval PDF</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Confirm or update the details below before regenerating and resending the approval PDF.
+              Confirm or update the details below before generating and sending the approval PDF.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -214,7 +221,7 @@ export default function ApprovalsPage() {
               disabled={isSending || !editName.trim() || !editLocation.trim()}
             >
               {isSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-              {isSending ? "Sending..." : "Resend PDF Now"}
+              {isSending ? "Sending..." : (selectedLead?.status === 'Approval Sent' ? "Resend PDF Now" : "Send PDF Now")}
             </Button>
           </DialogFooter>
         </DialogContent>
