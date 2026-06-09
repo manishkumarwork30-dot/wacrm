@@ -94,14 +94,14 @@ export async function POST(
 
     // 8. Send WhatsApp Message
     const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`
-    await sendDocumentMessage(
-      config.phone_number_id,
-      config.access_token,
-      phone,
-      publicUrl,
-      fileName,
-      captionText
-    )
+    await sendDocumentMessage({
+      phoneNumberId: config.phone_number_id,
+      accessToken: config.access_token,
+      to: phone,
+      documentUrl: publicUrl,
+      filename: fileName,
+      caption: captionText
+    })
 
     // 9. Update lead status to "Approval Sent"
     await supabaseAdmin()
