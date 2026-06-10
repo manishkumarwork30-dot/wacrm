@@ -446,8 +446,21 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
               filename: fileName,
               caption: captionText
             });
+            await db.from('messages').insert({
+              conversation_id: conversationId,
+              sender_type: 'agent',
+              content_type: 'document',
+              content_text: captionText,
+              media_url: publicUrl,
+              message_id: sentPdf.messageId,
+              status: 'sent',
+            });
             
-            await logBotMessage(conversationId, "Sent Approval PDF Document", sentPdf.messageId);
+            await db.from('conversations').update({
+              last_message_text: "Sent Approval PDF",
+              last_message_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }).eq('id', conversationId);
             
             // Mark as Approval Sent
             if (leadId) {

@@ -108,7 +108,8 @@ export async function POST(
       caption: captionText
     })
 
-    // Find conversation to log message into CRM Inbox
+    // Find or create conversation to log message into CRM Inbox
+    let conversationId = null
     const { data: conversation } = await supabaseAdmin()
       .from('conversations')
       .select('id')
@@ -116,8 +117,24 @@ export async function POST(
       .maybeSingle()
 
     if (conversation) {
+      conversationId = conversation.id
+    } else {
+      const { data: newConv, error: createError } = await supabaseAdmin()
+        .from('conversations')
+        .insert({
+          user_id: lead.user_id,
+          contact_id: lead.contacts.id,
+        })
+        .select('id')
+        .single()
+      if (!createError && newConv) {
+        conversationId = newConv.id
+      }
+    }
+
+    if (conversationId) {
       await supabaseAdmin().from('messages').insert({
-        conversation_id: conversation.id,
+        conversation_id: conversationId,
         sender_type: 'agent',
         content_type: 'document',
         content_text: captionText,
@@ -129,7 +146,7 @@ export async function POST(
         last_message_text: "Sent Approval PDF",
         last_message_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }).eq('id', conversation.id)
+      }).eq('id', conversationId)
     }
 
     // 9. Update lead status to "Approval Sent"
