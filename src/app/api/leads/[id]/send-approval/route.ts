@@ -95,7 +95,7 @@ export async function POST(
 
     // 8. Send WhatsApp Message
     const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`
-    await sendDocumentMessage({
+    const sentPdf = await sendDocumentMessage({
       phoneNumberId: config.phone_number_id,
       accessToken: decrypt(config.access_token),
       to: phone,
@@ -103,6 +103,30 @@ export async function POST(
       filename: fileName,
       caption: captionText
     })
+
+    // Find conversation to log message into CRM Inbox
+    const { data: conversation } = await supabaseAdmin()
+      .from('conversations')
+      .select('id')
+      .eq('contact_id', lead.contacts.id)
+      .maybeSingle()
+
+    if (conversation) {
+      await supabaseAdmin().from('messages').insert({
+        conversation_id: conversation.id,
+        sender_type: 'agent',
+        content_type: 'document',
+        content_text: captionText,
+        media_url: publicUrl,
+        message_id: sentPdf.messageId,
+        status: 'sent',
+      })
+      await supabaseAdmin().from('conversations').update({
+        last_message_text: "Sent Approval PDF",
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', conversation.id)
+    }
 
     // 9. Update lead status to "Approval Sent"
     await supabaseAdmin()

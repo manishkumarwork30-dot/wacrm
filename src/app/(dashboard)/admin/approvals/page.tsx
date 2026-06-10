@@ -75,10 +75,10 @@ export default function ApprovalsPage() {
       toast.success("Approval PDF re-sent successfully!");
       setIsModalOpen(false);
       
-      // Update local state timestamp
+      // Update local state timestamp and status
       setLeads(leads.map(l => {
         if (l.id === selectedLead.id) {
-          return { ...l, name: editName, location: editLocation, updated_at: new Date().toISOString() };
+          return { ...l, name: editName, location: editLocation, status: 'Approval Sent', updated_at: new Date().toISOString() };
         }
         return l;
       }));
