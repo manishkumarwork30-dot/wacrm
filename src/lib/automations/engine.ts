@@ -484,13 +484,21 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!waAccount) throw new Error('No WA account found');
 
       // Generate document
-      const pdfBytes = await generateCongratulationsDoc(lead.name || 'User', lead.location || 'Your Location');
+      const pdfBuffer = await generateCongratulationsDoc({
+        name: lead.name || 'User',
+        location: lead.location || 'Your Location',
+        mobile_no: lead.phone,
+        state: lead.state,
+        pin_code: lead.pin_code,
+        land_size: lead.land_size,
+        ownership: lead.ownership
+      });
       const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
 
       // Upload to storage
       const { data: uploadData, error: uploadError } = await db.storage
         .from('documents')
-        .upload(`welcomes/${lead.id}-${Date.now()}.pdf`, pdfBytes, {
+        .upload(`welcomes/${lead.id}-${Date.now()}.pdf`, pdfBuffer, {
           contentType: 'application/pdf',
           upsert: true
         });
