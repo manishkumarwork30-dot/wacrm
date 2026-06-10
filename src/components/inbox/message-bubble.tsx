@@ -172,23 +172,42 @@ function MessageContent({ message }: { message: Message }) {
         </div>
       );
 
-    case "document":
+    case "document": {
       if (!message.media_url) {
         return <MediaUnavailable label={message.content_text || "Document"} />;
       }
+      const displayFileName = (() => {
+        try {
+          const parts = message.media_url.split('/');
+          const lastPart = parts[parts.length - 1];
+          if (lastPart) {
+            const clean = decodeURIComponent(lastPart.split('?')[0]);
+            if (clean.includes('.')) return clean;
+          }
+        } catch {}
+        return "Document.pdf";
+      })();
       return (
-        <a
-          href={message.media_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg bg-slate-700/50 px-3 py-2 text-sm hover:bg-slate-700"
-        >
-          <FileText className="h-5 w-5 shrink-0 text-slate-400" />
-          <span className="truncate">
-            {message.content_text || "Document"}
-          </span>
-        </a>
+        <div className="flex flex-col gap-1.5">
+          <a
+            href={message.media_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-lg bg-slate-700/50 px-3 py-2 text-sm hover:bg-slate-700 text-slate-100 max-w-60"
+          >
+            <FileText className="h-5 w-5 shrink-0 text-slate-400" />
+            <span className="truncate flex-1 font-medium">
+              {displayFileName}
+            </span>
+          </a>
+          {message.content_text && message.content_text !== displayFileName && (
+            <p className="whitespace-pre-wrap break-words text-sm">
+              {message.content_text}
+            </p>
+          )}
+        </div>
       );
+    }
 
     case "template":
       return (
