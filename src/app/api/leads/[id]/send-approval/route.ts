@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { generateCongratulationsDoc } from '@/lib/document-generator'
 import { sendDocumentMessage } from '@/lib/whatsapp/meta-api'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
+import { decrypt } from '@/lib/whatsapp/encryption'
 
 export async function POST(
   request: Request,
@@ -96,7 +97,7 @@ export async function POST(
     const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`
     await sendDocumentMessage({
       phoneNumberId: config.phone_number_id,
-      accessToken: config.access_token,
+      accessToken: decrypt(config.access_token),
       to: phone,
       documentUrl: publicUrl,
       filename: fileName,

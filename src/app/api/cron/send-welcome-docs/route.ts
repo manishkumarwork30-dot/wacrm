@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateCongratulationsDoc } from '@/lib/document-generator';
 import { sendDocumentMessage } from '@/lib/whatsapp/meta-api';
+import { decrypt } from '@/lib/whatsapp/encryption';
 
 // This is the cron endpoint that runs every hour via Vercel
 export async function GET(req: Request) {
@@ -77,7 +78,7 @@ export async function GET(req: Request) {
         // 3. Send WhatsApp Document Message
         await sendDocumentMessage({
           phoneNumberId: waAccount.phone_number_id,
-          accessToken: waAccount.access_token,
+          accessToken: decrypt(waAccount.access_token),
           to: lead.mobile_no,
           documentUrl: documentUrl,
           filename: filename,
