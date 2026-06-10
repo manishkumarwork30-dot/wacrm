@@ -55,6 +55,17 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   /**
+   * Explicitly include PDFKit's font metric files (.afm) in the Vercel
+   * serverless function bundle. Without this, Vercel's file-system tracer
+   * misses them and PDFKit throws ENOENT for Helvetica.afm at runtime.
+   */
+  experimental: {
+    outputFileTracingIncludes: {
+      "/api/**/*": ["./node_modules/pdfkit/js/data/**/*"],
+    },
+  },
+
+  /**
    * Cache-Control policy.
    *
    * Why this exists:
