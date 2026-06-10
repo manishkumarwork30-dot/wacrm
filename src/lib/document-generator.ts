@@ -97,13 +97,16 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveDown(1);
 
-      // Add central watermark (Ashoka Pillar / Government Seal style concentric circles)
+      // Add central watermark (Logo)
       doc.save();
-      doc.strokeColor('#d1d5db').lineWidth(1);
-      doc.circle(297, 420, 150).stroke();
-      doc.circle(297, 420, 145).stroke();
-      doc.fontSize(22).font('Helvetica-Bold').fillColor('#e5e7eb').text('SURVEY OF INDIA', 197, 400, { width: 200, align: 'center' });
-      doc.fontSize(14).font('Helvetica').text('MADRAS', 197, 430, { width: 200, align: 'center' });
+      if (logoBuffer) {
+        try {
+          doc.opacity(0.1);
+          doc.image(logoBuffer, 147, 280, { width: 300 });
+        } catch (bgErr) {
+          console.error("Failed to draw background logo:", bgErr);
+        }
+      }
       doc.restore();
 
       // Title: APPROVAL LETTER
