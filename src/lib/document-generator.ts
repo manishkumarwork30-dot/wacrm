@@ -97,19 +97,8 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveDown(1);
 
-      // Add central watermark
+      // Add central watermark (Ashoka Pillar / Government Seal style concentric circles)
       doc.save();
-      if (logoBuffer) {
-        try {
-          doc.save();
-          doc.opacity(0.06); // Faded background watermark
-          // Center the logo (A4 size is 595.28 x 841.89)
-          doc.image(logoBuffer, 172.6, 295.9, { width: 250 });
-          doc.restore();
-        } catch (watermarkErr) {
-          console.error("Failed to draw watermark logo:", watermarkErr);
-        }
-      }
       doc.strokeColor('#d1d5db').lineWidth(1);
       doc.circle(297, 420, 150).stroke();
       doc.circle(297, 420, 145).stroke();
