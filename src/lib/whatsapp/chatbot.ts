@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendTextMessage } from './meta-api';
+import { sendTextMessage, sendDocumentMessage } from './meta-api';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
+import { generateCongratulationsDoc } from '@/lib/document-generator';
 
 let _adminClient: any = null;
 function getSupabaseAdmin() {
@@ -207,6 +208,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
 
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: senderPhone,
+        location: '',
+        state: '',
+        pin_code: '',
+        land_size: '',
+        ownership: '',
+        status: 'Pending - Name Collected'
+      });
+
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askLocationMsg);
       return true;
     }
@@ -221,6 +233,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         collected_data: collectedData,
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
+
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: senderPhone,
+        location: collectedData.location,
+        state: '',
+        pin_code: '',
+        land_size: '',
+        ownership: '',
+        status: 'Pending - Location Collected'
+      });
 
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askStateMsg);
       return true;
@@ -237,6 +260,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
 
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: senderPhone,
+        location: collectedData.location || '',
+        state: collectedData.state,
+        pin_code: '',
+        land_size: '',
+        ownership: '',
+        status: 'Pending - State Collected'
+      });
+
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askPinMsg);
       return true;
     }
@@ -251,6 +285,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         collected_data: collectedData,
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
+
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: senderPhone,
+        location: collectedData.location || '',
+        state: collectedData.state || '',
+        pin_code: collectedData.pin_code,
+        land_size: '',
+        ownership: '',
+        status: 'Pending - Pincode Collected'
+      });
 
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askMobileMsg);
       return true;
@@ -268,6 +313,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
 
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: collectedData.mobile_no,
+        location: collectedData.location || '',
+        state: collectedData.state || '',
+        pin_code: collectedData.pin_code || '',
+        land_size: '',
+        ownership: '',
+        status: 'Pending - Mobile Collected'
+      });
+
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askSizeMsg);
       return true;
     }
@@ -282,6 +338,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         collected_data: collectedData,
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
+
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: collectedData.mobile_no || senderPhone,
+        location: collectedData.location || '',
+        state: collectedData.state || '',
+        pin_code: collectedData.pin_code || '',
+        land_size: collectedData.land_size,
+        ownership: '',
+        status: 'Pending - Size Collected'
+      });
 
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askOwnershipMsg);
       return true;
@@ -353,6 +420,56 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         await db.from('chatbot_runs').delete().eq('id', run.id);
 
         await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, paymentMsg);
+
+        // SEND APPROVAL PDF AUTOMATICALLY
+        try {
+          console.log('[chatbot] Generating and sending Approval PDF automatically...');
+          const finalName = collectedData.name || 'Unknown';
+          const finalLocation = collectedData.location || 'Unknown Location';
+          const pdfBuffer = await generateCongratulationsDoc(finalName, finalLocation);
+          const fileName = `approval_${leadId || contactId}_${Date.now()}.pdf`;
+          
+          const { error: uploadError } = await db.storage.from('documents').upload(fileName, pdfBuffer, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+          
+          if (!uploadError) {
+            const { data: { publicUrl } } = db.storage.from('documents').getPublicUrl(fileName);
+            const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`;
+            
+            const sentPdf = await sendDocumentMessage({
+              phoneNumberId,
+              accessToken,
+              to: senderPhone,
+              documentUrl: publicUrl,
+              filename: fileName,
+              caption: captionText
+            });
+            
+            await logBotMessage(conversationId, "Sent Approval PDF Document", sentPdf.messageId);
+            
+            // Mark as Approval Sent
+            if (leadId) {
+              await db.from('tower_leads').update({ status: 'Approval Sent' }).eq('id', leadId);
+              // Also update sheet to reflect the approval was sent!
+              await postToGoogleSheets({
+                name: collectedData.name || 'Unknown',
+                mobile_no: collectedData.mobile_no || senderPhone,
+                location: collectedData.location || 'Not provided',
+                state: collectedData.state || '',
+                pin_code: collectedData.pin_code || '',
+                land_size: collectedData.land_size || '',
+                ownership: collectedData.is_owned || '',
+                status: 'Approval Sent'
+              });
+            }
+          } else {
+            console.error('[chatbot] Failed to upload generated PDF:', uploadError);
+          }
+        } catch (pdfErr) {
+          console.error('[chatbot] Failed to auto-send Approval PDF:', pdfErr);
+        }
 
         // Trigger visual automations waiting for tower completion
         runAutomationsForTrigger({
