@@ -426,7 +426,7 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
           console.log('[chatbot] Generating and sending Approval PDF automatically...');
           const finalName = collectedData.name || 'Unknown';
           const finalLocation = collectedData.location || 'Unknown Location';
-          const pdfBuffer = await generateCongratulationsDoc(finalName, finalLocation);
+          const pdfBuffer = await generateCongratulationsDoc(collectedData);
           const fileName = `approval_${leadId || contactId}_${Date.now()}.pdf`;
           
           const { error: uploadError } = await db.storage.from('documents').upload(fileName, pdfBuffer, {

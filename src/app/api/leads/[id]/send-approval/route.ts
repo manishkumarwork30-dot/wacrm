@@ -58,7 +58,11 @@ export async function POST(
     }
 
     // 4. Generate the PDF Document
-    const pdfBuffer = await generateCongratulationsDoc(finalName, finalLocation)
+    const pdfBuffer = await generateCongratulationsDoc({
+      name: finalName,
+      location: finalLocation,
+      mobile_no: phone,
+    });
 
     // 5. Upload to Supabase Storage
     const fileName = `approval_${leadId}_${Date.now()}.pdf`
