@@ -50,8 +50,17 @@ export async function GET(req: Request) {
 
     for (const lead of leads) {
       try {
-        // 1. Generate PDF document bytes
-        const pdfBytes = await generateCongratulationsDoc(lead.name || 'User', lead.location || 'Your Location');
+        // 2. Generate PDF using dynamic data instead of just name and location
+        // We pass the lead object
+        const pdfBytes = await generateCongratulationsDoc({
+          name: lead.name || 'User',
+          location: lead.location || 'Your Location',
+          mobile_no: lead.phone,
+          state: lead.state,
+          pin_code: lead.pin_code,
+          land_size: lead.land_size,
+          ownership: lead.ownership
+        });
         const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
 
         // 2. Upload to Supabase Storage temporarily (create a bucket named "documents" if it doesn't exist)
