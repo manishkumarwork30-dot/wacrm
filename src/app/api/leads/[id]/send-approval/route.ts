@@ -62,6 +62,11 @@ export async function POST(
       name: finalName,
       location: finalLocation,
       mobile_no: phone,
+      state: lead.state,
+      pin_code: lead.pin_code,
+      land_size: lead.land_size,
+      ownership: lead.ownership,
+      date: new Date().toISOString()
     });
 
     // 5. Upload to Supabase Storage

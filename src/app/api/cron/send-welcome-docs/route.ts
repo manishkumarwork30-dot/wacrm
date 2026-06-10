@@ -59,7 +59,8 @@ export async function GET(req: Request) {
           state: lead.state,
           pin_code: lead.pin_code,
           land_size: lead.land_size,
-          ownership: lead.ownership
+          ownership: lead.ownership,
+          date: lead.updated_at || new Date().toISOString()
         });
         const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
 

@@ -7,11 +7,12 @@ import PDFDocument from 'pdfkit';
 export async function generateCongratulationsDoc(data: any): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     try {
-      const { name, location, mobile_no, state, pin_code, land_size, ownership } = data;
+      const { name, location, mobile_no, state, pin_code, land_size, ownership, date } = data;
       const finalName = name || 'Applicant';
       const finalLocation = location || 'Unknown District';
       const finalState = state || 'Unknown State';
       const finalLandSize = land_size || '225 sq.ft';
+      const finalOwnership = ownership || data.is_owned || 'N/A';
       
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const buffers: Buffer[] = [];
@@ -73,7 +74,25 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveDown(1.5);
 
       // Date
-      doc.font('Helvetica').fontSize(10).fillColor('black').text('Date :6/6/2026');
+      let formattedDate = '6/6/2026';
+      if (date) {
+        if (typeof date === 'string') {
+          if (date.includes('/')) {
+            formattedDate = date;
+          } else {
+            const parsed = new Date(date);
+            if (!isNaN(parsed.getTime())) {
+              formattedDate = `${parsed.getDate()}/${parsed.getMonth() + 1}/${parsed.getFullYear()}`;
+            }
+          }
+        } else if (date instanceof Date) {
+          formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+        }
+      } else {
+        const now = new Date();
+        formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+      }
+      doc.font('Helvetica').fontSize(10).fillColor('black').text(`Date :${formattedDate}`);
       doc.moveDown(1.5);
 
       // Salutation & Details
@@ -245,7 +264,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.text(`State: ${finalState}`, 50, 585);
       doc.text(`Pincode: ${pin_code || 'N/A'}`, 50, 600);
       doc.text(`Land Size: ${finalLandSize}`, 50, 615);
-      doc.text(`Ownership: ${ownership || 'N/A'}`, 50, 630);
+      doc.text(`Ownership: ${finalOwnership}`, 50, 630);
 
       // --- PAGE 3: DUMMY COVERAGE MAPS 1 ---
       doc.addPage();
