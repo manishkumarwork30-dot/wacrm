@@ -5,6 +5,26 @@ import PDFDocument from 'pdfkit';
  * Matches the requested layout for the HTL Network Approval Letter.
  */
 export async function generateCongratulationsDoc(data: any): Promise<Uint8Array> {
+  const logoUrl = "https://htlnetwork.com/assets/images/logo.png";
+  const qrUrl = "https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png";
+
+  const fetchImage = async (url: string): Promise<Buffer | null> => {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        return Buffer.from(await res.arrayBuffer());
+      }
+    } catch (e) {
+      console.error(`[PDF Generator] Failed to fetch image ${url}:`, e);
+    }
+    return null;
+  };
+
+  const [logoBuffer, qrBuffer] = await Promise.all([
+    fetchImage(logoUrl),
+    fetchImage(qrUrl)
+  ]);
+
   return new Promise((resolve, reject) => {
     try {
       const { name, location, mobile_no, state, pin_code, land_size, ownership, date } = data;
@@ -25,29 +45,47 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // --- PAGE 1: APPROVAL LETTER ---
       
-      // Draw a clean vector tower logo on top-left
-      // Base tower structure
-      doc.save();
-      doc.translate(45, 30);
-      doc.lineWidth(1.5);
-      doc.strokeColor('#2563eb'); // Tailwind blue-600
-      
-      // Draw tower legs
-      doc.moveTo(15, 45).lineTo(25, 10).lineTo(35, 45).stroke();
-      // Tower crossbars
-      doc.moveTo(22, 22).lineTo(28, 22).stroke();
-      doc.moveTo(19, 33).lineTo(31, 33).stroke();
-      // Signal waves (arcs)
-      (doc as any).arc(25, 10, 8, Math.PI * 1.25, Math.PI * 1.75, false);
-      doc.stroke();
-      (doc as any).arc(25, 10, 14, Math.PI * 1.25, Math.PI * 1.75, false);
-      doc.stroke();
-      (doc as any).arc(25, 10, 20, Math.PI * 1.25, Math.PI * 1.75, false);
-      doc.stroke();
-      
-      // Text under logo
-      doc.fillColor('black').font('Helvetica-Bold').fontSize(8).text('htlnetwork', 0, 50, { width: 50, align: 'center' });
-      doc.restore();
+      // Top-left Logo
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, 45, 25, { width: 60 });
+        } catch (logoErr) {
+          console.error("Failed to draw logo image:", logoErr);
+          // Fallback vector tower
+          doc.save();
+          doc.translate(45, 30);
+          doc.lineWidth(1.5);
+          doc.strokeColor('#2563eb');
+          doc.moveTo(15, 45).lineTo(25, 10).lineTo(35, 45).stroke();
+          doc.moveTo(22, 22).lineTo(28, 22).stroke();
+          doc.moveTo(19, 33).lineTo(31, 33).stroke();
+          (doc as any).arc(25, 10, 8, Math.PI * 1.25, Math.PI * 1.75, false);
+          doc.stroke();
+          (doc as any).arc(25, 10, 14, Math.PI * 1.25, Math.PI * 1.75, false);
+          doc.stroke();
+          (doc as any).arc(25, 10, 20, Math.PI * 1.25, Math.PI * 1.75, false);
+          doc.stroke();
+          doc.fillColor('black').font('Helvetica-Bold').fontSize(8).text('htlnetwork', 0, 50, { width: 50, align: 'center' });
+          doc.restore();
+        }
+      } else {
+        // Fallback vector tower
+        doc.save();
+        doc.translate(45, 30);
+        doc.lineWidth(1.5);
+        doc.strokeColor('#2563eb');
+        doc.moveTo(15, 45).lineTo(25, 10).lineTo(35, 45).stroke();
+        doc.moveTo(22, 22).lineTo(28, 22).stroke();
+        doc.moveTo(19, 33).lineTo(31, 33).stroke();
+        (doc as any).arc(25, 10, 8, Math.PI * 1.25, Math.PI * 1.75, false);
+        doc.stroke();
+        (doc as any).arc(25, 10, 14, Math.PI * 1.25, Math.PI * 1.75, false);
+        doc.stroke();
+        (doc as any).arc(25, 10, 20, Math.PI * 1.25, Math.PI * 1.75, false);
+        doc.stroke();
+        doc.fillColor('black').font('Helvetica-Bold').fontSize(8).text('htlnetwork', 0, 50, { width: 50, align: 'center' });
+        doc.restore();
+      }
 
       // Company Title on the right of the header
       doc.save();
@@ -59,8 +97,19 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveDown(1);
 
-      // Add central watermark (Ashoka Pillar / Government Seal style concentric circles)
+      // Add central watermark
       doc.save();
+      if (logoBuffer) {
+        try {
+          doc.save();
+          doc.opacity(0.06); // Faded background watermark
+          // Center the logo (A4 size is 595.28 x 841.89)
+          doc.image(logoBuffer, 172.6, 295.9, { width: 250 });
+          doc.restore();
+        } catch (watermarkErr) {
+          console.error("Failed to draw watermark logo:", watermarkErr);
+        }
+      }
       doc.strokeColor('#d1d5db').lineWidth(1);
       doc.circle(297, 420, 150).stroke();
       doc.circle(297, 420, 145).stroke();
@@ -152,41 +201,77 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       const qrX = 420;
       doc.font('Helvetica-Bold').fontSize(9).text('Please scan the bar code and check Approval', 220, signY, { width: 190, align: 'right' });
       
-      // Draw dynamic vector QR Code
-      doc.save();
-      doc.translate(qrX, signY + 10);
-      doc.strokeColor('black').lineWidth(1.5);
-      doc.rect(0, 0, 80, 80).stroke(); // Outline
-      
-      // Corner squares (Finder patterns)
-      const drawFinder = (x: number, y: number) => {
-        doc.rect(x, y, 20, 20).fill('black');
-        doc.rect(x + 3, y + 3, 14, 14).fill('white');
-        doc.rect(x + 6, y + 6, 8, 8).fill('black');
-      };
-      drawFinder(4, 4);
-      drawFinder(56, 4);
-      drawFinder(4, 56);
-      
-      // Mock barcode grid blocks
-      doc.fill('black');
-      const mockPoints = [
-        [28, 4], [32, 4], [40, 4], [44, 4],
-        [28, 8], [36, 8], [48, 8],
-        [28, 12], [32, 12], [40, 12], [44, 12],
-        [4, 28], [8, 28], [16, 28], [24, 28], [36, 28], [44, 28], [56, 28], [68, 28],
-        [12, 32], [20, 32], [28, 32], [40, 32], [48, 32], [60, 32],
-        [4, 36], [16, 36], [24, 36], [32, 36], [48, 36], [56, 36], [64, 36],
-        [8, 40], [28, 40], [36, 40], [44, 40], [60, 40],
-        [56, 48], [60, 48], [68, 48],
-        [56, 56], [64, 56], [72, 56],
-        [60, 60], [68, 60],
-        [56, 68], [64, 68], [72, 68]
-      ];
-      mockPoints.forEach(([px, py]) => {
-        doc.rect(px, py, 4, 4).fill('black');
-      });
-      doc.restore();
+      // Draw QR Code
+      if (qrBuffer) {
+        try {
+          doc.image(qrBuffer, qrX, signY + 10, { width: 80, height: 80 });
+        } catch (qrErr) {
+          console.error("Failed to draw QR image:", qrErr);
+          // Fallback vector QR Code
+          doc.save();
+          doc.translate(qrX, signY + 10);
+          doc.strokeColor('black').lineWidth(1.5);
+          doc.rect(0, 0, 80, 80).stroke();
+          const drawFinder = (x: number, y: number) => {
+            doc.rect(x, y, 20, 20).fill('black');
+            doc.rect(x + 3, y + 3, 14, 14).fill('white');
+            doc.rect(x + 6, y + 6, 8, 8).fill('black');
+          };
+          drawFinder(4, 4);
+          drawFinder(56, 4);
+          drawFinder(4, 56);
+          doc.fill('black');
+          const mockPoints = [
+            [28, 4], [32, 4], [40, 4], [44, 4],
+            [28, 8], [36, 8], [48, 8],
+            [28, 12], [32, 12], [40, 12], [44, 12],
+            [4, 28], [8, 28], [16, 28], [24, 28], [36, 28], [44, 28], [56, 28], [68, 28],
+            [12, 32], [20, 32], [28, 32], [40, 32], [48, 32], [60, 32],
+            [4, 36], [16, 36], [24, 36], [32, 36], [48, 36], [56, 36], [64, 36],
+            [8, 40], [28, 40], [36, 40], [44, 40], [60, 40],
+            [56, 48], [60, 48], [68, 48],
+            [56, 56], [64, 56], [72, 56],
+            [60, 60], [68, 60],
+            [56, 68], [64, 68], [72, 68]
+          ];
+          mockPoints.forEach(([px, py]) => {
+            doc.rect(px, py, 4, 4).fill('black');
+          });
+          doc.restore();
+        }
+      } else {
+        // Fallback vector QR Code
+        doc.save();
+        doc.translate(qrX, signY + 10);
+        doc.strokeColor('black').lineWidth(1.5);
+        doc.rect(0, 0, 80, 80).stroke();
+        const drawFinder = (x: number, y: number) => {
+          doc.rect(x, y, 20, 20).fill('black');
+          doc.rect(x + 3, y + 3, 14, 14).fill('white');
+          doc.rect(x + 6, y + 6, 8, 8).fill('black');
+        };
+        drawFinder(4, 4);
+        drawFinder(56, 4);
+        drawFinder(4, 56);
+        doc.fill('black');
+        const mockPoints = [
+          [28, 4], [32, 4], [40, 4], [44, 4],
+          [28, 8], [36, 8], [48, 8],
+          [28, 12], [32, 12], [40, 12], [44, 12],
+          [4, 28], [8, 28], [16, 28], [24, 28], [36, 28], [44, 28], [56, 28], [68, 28],
+          [12, 32], [20, 32], [28, 32], [40, 32], [48, 32], [60, 32],
+          [4, 36], [16, 36], [24, 36], [32, 36], [48, 36], [56, 36], [64, 36],
+          [8, 40], [28, 40], [36, 40], [44, 40], [60, 40],
+          [56, 48], [60, 48], [68, 48],
+          [56, 56], [64, 56], [72, 56],
+          [60, 60], [68, 60],
+          [56, 68], [64, 68], [72, 68]
+        ];
+        mockPoints.forEach(([px, py]) => {
+          doc.rect(px, py, 4, 4).fill('black');
+        });
+        doc.restore();
+      }
 
       // Footer
       doc.save();
