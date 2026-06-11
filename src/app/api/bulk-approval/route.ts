@@ -125,13 +125,15 @@ export async function POST(request: Request) {
     }
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    // Convert Node Buffer → Uint8Array (valid BodyInit in TypeScript / Next.js)
+    const zipBytes = new Uint8Array(zipBuffer);
 
-    return new Response(zipBuffer, {
+    return new Response(zipBytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="HTL_Approvals_${todayStr.replace(/\//g, '-')}.zip"`,
-        'Content-Length': zipBuffer.length.toString(),
+        'Content-Length': zipBytes.length.toString(),
         'X-Generated-Count': fileCount.toString(),
         'X-Error-Count': errors.length.toString(),
       },

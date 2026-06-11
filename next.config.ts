@@ -54,7 +54,9 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  /**
    * Cache-Control policy.
+
    *
    * Why this exists:
    *   Hostinger's CDN was applying `s-maxage=31536000` (1 year) to
