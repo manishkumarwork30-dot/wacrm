@@ -73,8 +73,9 @@ function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
   if (!buf) return;
   doc.save();
   try {
-    doc.opacity(0.1);
-    doc.image(buf, 148, 270, { width: 300 });
+    doc.opacity(0.06); // lighter opacity for full-page watermark
+    // Center it on the A4 page (595x842)
+    doc.image(buf, 47, 121, { width: 500, height: 600 });
   } catch { /* skip on image error */ }
   doc.restore();
 }
@@ -146,30 +147,29 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       // Watermark (drawn first so content renders on top)
       drawWatermark(doc, assets.watermark);
 
-      // Top logo - centered
-      const logoWidth = 50;
-      const logoX = (595 - logoWidth) / 2;
+      // Top-left Logo
       if (assets.logo) {
-        try { doc.image(assets.logo, logoX, 20, { width: logoWidth }); }
-        catch { _drawFallbackTower(doc, logoX, 20); }
+        try { doc.image(assets.logo, 45, 25, { width: 60 }); }
+        catch { _drawFallbackTower(doc, 45, 25); }
       } else {
-        _drawFallbackTower(doc, logoX, 20);
+        _drawFallbackTower(doc, 45, 25);
       }
 
-      // Company title - centered below logo
+      // Company title on the right of the logo
       doc.save();
       doc.fillColor('#0000FF');
-      doc.font(B).fontSize(28).text('HTL NETWORK', 50, 70, { align: 'center', characterSpacing: 1 });
+      doc.font(B).fontSize(36).text('HTL NETWORK', 130, 32, { characterSpacing: 1 });
       doc.restore();
 
       // Header divider
-      doc.moveTo(50, 105).lineTo(545, 105).strokeColor('#2563eb').lineWidth(2).stroke();
+      doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
+      doc.moveDown(1);
 
       // APPROVAL LETTER title
-      doc.moveDown(0.2);
+      doc.moveDown(0.5);
       doc.font(B).fontSize(12).fillColor('#0000FF')
          .text('APPROVAL LETTER', { align: 'center', underline: true });
-      doc.moveDown(0.6);
+      doc.moveDown(1.5);
 
       // Date
       let formattedDate: string;
@@ -193,38 +193,38 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(9.5).fillColor('black').text(`Date : ${formattedDate}`);
-      doc.moveDown(0.6);
+      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`);
+      doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(9.5).text('DEAR PROSPECTIVE LANDLORD');
-      doc.moveDown(0.4);
-      doc.font(B).fontSize(10).text(`Mr. ${finalName}`);
-      doc.font(B).fontSize(10).text(`District ${finalLocation}`);
-      doc.moveDown(0.6);
+      doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD');
+      doc.moveDown(0.8);
+      doc.font(B).fontSize(11).text(`Mr. ${finalName}`);
+      doc.font(B).fontSize(11).text(`District ${finalLocation}`);
+      doc.moveDown(1.2);
 
-      // Body paragraphs (adjusted spacing to fit everything perfectly on Page 1)
-      doc.font(R).fontSize(9).fillColor('black');
+      // Body paragraphs
+      doc.font(R).fontSize(9.5).fillColor('black');
       doc.text(
         `HTL NETWORK PVT. LTD. is looking for tower location across different state in India. We are very glad to inform that VI 5G NETWORK has agreed to install its NETWORK Tower with the given referenceDDD/KG/1044J/05G on the land referred by you. On the basis of your documents and suitability of your land space, the issue to be held. The agreement period is for 20 years and can be extend for further 15 years, if both parties agreed. In case of expanding of tower maturity period, the term and condition will be according to policies of the company in the financial year and laws of the government. After issued of your License certificate, our company will provide you a sum of Rs. 70 lacs as advance and rent of first month. During the agreement period the sum of Rs.60,000/-per month will be allocated for as rent with an increment of 10% per year (Out of rent allotted, 30,000 will be credited to your account and rest 30,000 will be deducted as EMI on 70 lacs Advance so that amount will be recovered within 20 years agreement\'s time period) and Rs. 22000/- as salary for security Guard. All the rule and regulation will be governed by companies ACT 1956 in case of any legal procedure.`,
-        { align: 'justify', lineGap: 1.5 }
+        { align: 'justify', lineGap: 2.2 }
       );
-      doc.moveDown(0.6);
+      doc.moveDown(1.0);
       doc.text(
         `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
-        { align: 'justify', lineGap: 1.5 }
+        { align: 'justify', lineGap: 2.2 }
       );
-      doc.moveDown(0.6);
+      doc.moveDown(1.0);
       doc.text(
         `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
-        { align: 'justify', lineGap: 1.5 }
+        { align: 'justify', lineGap: 2.2 }
       );
-      doc.moveDown(0.6);
+      doc.moveDown(1.0);
       doc.text(
         `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
-        { align: 'justify', lineGap: 1.5 }
+        { align: 'justify', lineGap: 2.2 }
       );
-      doc.moveDown(1.2);
+      doc.moveDown(1.8);
 
       // Signature / Stamp / QR row
       const signY = doc.y;
