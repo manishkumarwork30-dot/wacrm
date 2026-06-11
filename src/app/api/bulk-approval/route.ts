@@ -107,6 +107,7 @@ export async function POST(request: Request) {
 
         zip.file(filename, pdfBytes);
       } catch (rowErr: any) {
+        console.error(`Error generating PDF for row ${i + 2} (${name}):`, rowErr);
         errors.push(`Row ${i + 2} (${name}): ${rowErr.message}`);
       }
     }
