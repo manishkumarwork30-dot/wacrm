@@ -1,9 +1,7 @@
 import PDFDocument from 'pdfkit';
 
-/**
- * Module-level cache — warm serverless containers reuse these buffers
- * across invocations without re-fetching from the network.
- */
+// ── Module-level caches (reused across warm serverless containers) ────────────
+
 let _fontCache: {
   regular: Buffer | null;
   bold: Buffer | null;
@@ -15,6 +13,13 @@ let _assetCache: {
   qr: Buffer | null;
   signature: Buffer | null;
   stamp: Buffer | null;
+  watermark: Buffer | null;   // Survey-Of-India.png  – shown on every page
+  hdrP2P3: Buffer | null;     // Picture3.png         – page 2 & 3 header
+  hdrP4: Buffer | null;       // page 4 header image
+  p3img1: Buffer | null;      // Picture7.png         – page 3 content
+  p3img2: Buffer | null;      // Picture8.png         – page 3 content
+  p4img1: Buffer | null;      // Picture9.png         – page 4 content
+  p4img2: Buffer | null;      // Picture10.png        – page 4 content
 } | null = null;
 
 const fetchBuffer = async (url: string): Promise<Buffer | null> => {
@@ -42,20 +47,68 @@ const getFonts = async () => {
 
 const getAssets = async () => {
   if (_assetCache) return _assetCache;
-  const [logo, qr, signature, stamp] = await Promise.all([
+  const [
+    logo, qr, signature, stamp,
+    watermark, hdrP2P3, hdrP4,
+    p3img1, p3img2, p4img1, p4img2,
+  ] = await Promise.all([
     fetchBuffer('https://htlnetwork.com/assets/images/logo.png'),
     fetchBuffer('https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png'),
     fetchBuffer('https://i.ibb.co/Fqj8CGm3/signature.png'),
     fetchBuffer('https://i.ibb.co/v6cQ2rDC/approval-image.png'),
+    fetchBuffer('https://i.ibb.co/PZKK8CZ4/Survey-Of-India.png'),  // watermark – every page
+    fetchBuffer('https://i.ibb.co/hJpwPfZd/Picture3.png'),          // page 2 & 3 header
+    fetchBuffer('https://i.ibb.co/9kRSFtV4/Picture4.png'),          // page 4 header (try direct)
+    fetchBuffer('https://i.ibb.co/b0wmpr0/Picture7.png'),
+    fetchBuffer('https://i.ibb.co/CpYqYxP0/Picture8.png'),
+    fetchBuffer('https://i.ibb.co/Xrfg6kYb/Picture9.png'),
+    fetchBuffer('https://i.ibb.co/YBkM6RZq/Picture10.png'),
   ]);
-  _assetCache = { logo, qr, signature, stamp };
+  _assetCache = { logo, qr, signature, stamp, watermark, hdrP2P3, hdrP4, p3img1, p3img2, p4img1, p4img2 };
   return _assetCache;
 };
 
+/** Draw the Survey-of-India watermark centred on the current page (every page). */
+function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
+  if (!buf) return;
+  doc.save();
+  try {
+    doc.opacity(0.1);
+    doc.image(buf, 148, 270, { width: 300 });
+  } catch { /* skip on image error */ }
+  doc.restore();
+}
+
 /**
- * Generates a personalized 4-page PDF document for the qualified lead using PDFKit.
- * Matches the requested layout for the HTL Network Approval Letter.
- * Fonts are loaded from CDN (no filesystem AFM dependency – safe on Vercel).
+ * Draw a page header image spanning the full content width.
+ * Falls back to a plain text box when the image is unavailable.
+ */
+function drawPageHeader(
+  doc: PDFKit.PDFDocument,
+  buf: Buffer | null,
+  fallbackText: string,
+  B: string,
+) {
+  if (buf) {
+    try {
+      doc.image(buf, 50, 30, { width: 495, height: 70 });
+      doc.y = 110;
+      return;
+    } catch { /* fall through to text box */ }
+  }
+  doc.rect(50, 30, 495, 60).stroke();
+  doc.fontSize(12).font(B).text(fallbackText, 60, 55, { align: 'center', width: 475 });
+  doc.y = 100;
+}
+
+/**
+ * Generates a personalized 4-page PDF document for the qualified lead.
+ * • Page 1 : Approval Letter (logo header, full body, signature, QR)
+ * • Page 2 : Survey Report  (Picture3 header, survey content, applicant details)
+ * • Page 3 : Coverage maps  (Picture3 header, Picture7 + Picture8)
+ * • Page 4 : Coverage maps  (Picture4 header, Picture9 + Picture10)
+ * Fonts fetched from CDN; built-in Helvetica used as local fallback.
+ * Survey-of-India watermark appears on every page.
  */
 export async function generateCongratulationsDoc(data: any): Promise<Uint8Array> {
   const [fonts, assets] = await Promise.all([getFonts(), getAssets()]);
@@ -65,10 +118,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       const {
         name, location, mobile_no, state, pin_code, land_size, ownership, date,
       } = data;
+
       const finalName      = name      || 'Applicant';
       const finalLocation  = location  || 'Unknown District';
       const finalState     = state     || 'Unknown State';
-      const finalLandSize  = land_size || '225 sq.ft';
+      const finalLandSize  = land_size || '225 sqft';
       const finalOwnership = ownership || data.is_owned || 'N/A';
 
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -76,19 +130,21 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.on('data', buffers.push.bind(buffers));
       doc.on('end', () => resolve(new Uint8Array(Buffer.concat(buffers))));
 
-      // Register custom TTF fonts when available (Vercel/CDN).
-      // Fall back to built-in Helvetica when running locally (has .afm files).
+      // Register CDN fonts; fall back to built-in Helvetica when unavailable
       if (fonts.regular) doc.registerFont('R', fonts.regular);
       if (fonts.bold)    doc.registerFont('B', fonts.bold);
       if (fonts.italic)  doc.registerFont('I', fonts.italic);
 
-      // Use registered names when available, else built-in PDF standard fonts
       const R = fonts.regular ? 'R' : 'Helvetica';
       const B = fonts.bold    ? 'B' : 'Helvetica-Bold';
       const I = fonts.italic  ? 'I' : 'Helvetica-Oblique';
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 1 – APPROVAL LETTER
+      // ═══════════════════════════════════════════════════════════════════════
 
-      // ── PAGE 1: APPROVAL LETTER ───────────────────────────────────────────
+      // Watermark (drawn first so content renders on top)
+      drawWatermark(doc, assets.watermark);
 
       // Top-left Logo
       if (assets.logo) {
@@ -98,7 +154,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         _drawFallbackTower(doc);
       }
 
-      // Company title (right of header)
+      // Company title
       doc.save();
       doc.fillColor('#0000FF');
       doc.font(B).fontSize(36).text('HTL NETWORK', 130, 32, { characterSpacing: 1 });
@@ -108,14 +164,6 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveDown(1);
 
-      // Background logo watermark
-      if (assets.logo) {
-        doc.save();
-        try { doc.opacity(0.08).image(assets.logo, 147, 280, { width: 300 }); }
-        catch { /* skip watermark on error */ }
-        doc.restore();
-      }
-
       // APPROVAL LETTER title
       doc.moveDown(0.5);
       doc.font(B).fontSize(12).fillColor('#0000FF')
@@ -124,6 +172,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Date
       let formattedDate: string;
+      const now = new Date();
       if (date) {
         if (typeof date === 'string') {
           formattedDate = date.includes('/')
@@ -131,19 +180,18 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
             : (() => {
                 const p = new Date(date);
                 return isNaN(p.getTime())
-                  ? date
+                  ? `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
                   : `${p.getDate()}/${p.getMonth() + 1}/${p.getFullYear()}`;
               })();
         } else if (date instanceof Date) {
           formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
         } else {
-          const now = new Date();
           formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
         }
       } else {
-        const now = new Date();
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
+
       doc.font(R).fontSize(10).fillColor('black').text(`Date :${formattedDate}`);
       doc.moveDown(1.5);
 
@@ -161,13 +209,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         { align: 'justify', lineGap: 3 }
       );
       doc.moveDown(1.5);
-
       doc.text(
         `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
         { align: 'justify', lineGap: 3 }
       );
       doc.moveDown(1.5);
-
       doc.text(
         `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
         { align: 'justify', lineGap: 3 }
@@ -178,13 +224,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       );
       doc.moveDown(3);
 
-      // ── Signature / Stamp / QR section ───────────────────────────────────
+      // Signature / Stamp / QR row
       const signY = doc.y;
 
-      // Left: Authorized Signatory label
       doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 50, signY);
 
-      // Real signature image (or vector fallback)
       if (assets.signature) {
         try { doc.image(assets.signature, 50, signY + 18, { width: 90, height: 40 }); }
         catch { _drawFallbackSignature(doc, signY); }
@@ -192,7 +236,6 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         _drawFallbackSignature(doc, signY);
       }
 
-      // Real approval stamp image (or vector fallback)
       if (assets.stamp) {
         try { doc.image(assets.stamp, 155, signY, { width: 80, height: 80 }); }
         catch { _drawFallbackStamp(doc, signY); }
@@ -200,7 +243,6 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         _drawFallbackStamp(doc, signY);
       }
 
-      // Right side: scan text + QR code
       const qrX = 420;
       doc.font(B).fontSize(9).fillColor('black')
          .text('Please scan the bar code and check Approval', 250, signY, { width: 165, align: 'right' });
@@ -221,107 +263,150 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       );
       doc.restore();
 
-      // ── PAGE 2: SURVEY REPORT ─────────────────────────────────────────────
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 2 – SURVEY REPORT
+      // ═══════════════════════════════════════════════════════════════════════
       doc.addPage();
-      doc.rect(50, 30, 495, 60).stroke();
-      doc.fontSize(12).font(B).text('Department of Science & Technology', 60, 50, { align: 'center' });
-      doc.fontSize(10).font(R).text('Survey of India', 60, 65, { align: 'center' });
-      doc.moveDown(4);
 
-      doc.fontSize(12).font(B).text('DEAR, PROSPECTIVE LANDLORD', 50, 120);
-      doc.fillColor('blue').fontSize(14).text('LOCATION - ID - VI / 5G 0001', 50, 140);
-      doc.moveDown(2);
+      drawWatermark(doc, assets.watermark);
+      drawPageHeader(doc, assets.hdrP2P3, 'Department of Science & Technology | Survey of India', B);
 
-      doc.fillColor('black').fontSize(10).text(
-        'THE SURVEY DEPARTMENT OF INDIA CONDUCTED SURVEY FOR THE TOWER INSTALLATION. SURVEY REPORT IS POSITIVE WITH THE LAND PROPOSED BY YOU NOW VI 5G NETWORK HAS BEEN ALLOWED FOR FURTHER PROCESS NOW VI 5G NETWORK IS ALLOWED TO INSTALL TOWER AT GIVEN ABOVE ADDRESS THE SURVEY REPORT IS LIMITED AND CONFIDENTIAL.',
-        50, 170, { align: 'justify' }
+      const p2ContentY = doc.y + 10;
+
+      doc.fontSize(12).font(B).fillColor('black').text('DEAR, PROSPECTIVE LANDLORD', 50, p2ContentY);
+      doc.fillColor('blue').fontSize(14).text('LOCATION - ID - VI / 5G 0001', 50, p2ContentY + 20);
+
+      doc.moveDown(1.5);
+      doc.fillColor('black').fontSize(10).font(R).text(
+        'THE SURVEY DEPARTMENT OF INDIA CONDUCTED SURVEY FOR THE TOWER INSTALLATION SURVEY REPORT IS POSITIVE WITH THE LAND PROPOSED BY YOU NOW VI 5G NETWORK HAS BEEN ALLOWED FOR FURTHER PROCESS NOW VI 5G NETWORK IS ALLOWED TO INSTALL TOWER AT GIVEN ABOVE ADDRESS THE SURVEY REPORT IS LIMITED AND CONFIDENTIAL.',
+        50, doc.y, { align: 'justify', lineGap: 2 }
       );
-      doc.moveDown(2);
+      doc.moveDown(1.5);
 
-      const tableTop = 230;
-      doc.rect(50, tableTop, 495, 25).stroke();
-      doc.font(B).text('LAND',              50,  tableTop + 8, { width: 120, align: 'center' });
-      doc.text('GOVERNMENT REPORT',         170, tableTop + 8, { width: 150, align: 'center' });
-      doc.text('GEO POSITION',              320, tableTop + 8, { width: 100, align: 'center' });
-      doc.text('REQUIREMENT',               420, tableTop + 8, { width: 125, align: 'center' });
+      // Survey table
+      const tTop = doc.y;
+      const colW  = [120, 150, 100, 125];
+      const cols  = [50, 170, 320, 420];
 
-      doc.rect(50, tableTop + 25, 495, 25).stroke();
-      doc.font(R).text('APPROVED',  50,  tableTop + 33, { width: 120, align: 'center' });
-      doc.text('CONFIRM',           170, tableTop + 33, { width: 150, align: 'center' });
-      doc.text('VERY GOOD',         320, tableTop + 33, { width: 100, align: 'center' });
-      doc.text('YES',               420, tableTop + 33, { width: 125, align: 'center' });
+      // Header row
+      doc.rect(50, tTop, 495, 25).stroke();
+      const tHeaders = ['LAND', 'GOVERNMENT REPORT', 'GEO POSITION', 'REQUIREMENT'];
+      tHeaders.forEach((h, i) =>
+        doc.font(B).fontSize(9).fillColor('black').text(h, cols[i], tTop + 8, { width: colW[i], align: 'center' })
+      );
+      // Data row
+      doc.rect(50, tTop + 25, 495, 25).stroke();
+      const tData = ['APPROVED', 'CONFIRM', 'VERY GOOD', 'YES'];
+      tData.forEach((d, i) =>
+        doc.font(R).fontSize(9).text(d, cols[i], tTop + 33, { width: colW[i], align: 'center' })
+      );
+      // Vertical separators
+      [170, 320, 420].forEach(x => {
+        doc.moveTo(x, tTop).lineTo(x, tTop + 50).stroke();
+      });
 
-      doc.moveTo(170, tableTop).lineTo(170, tableTop + 50).stroke();
-      doc.moveTo(320, tableTop).lineTo(320, tableTop + 50).stroke();
-      doc.moveTo(420, tableTop).lineTo(420, tableTop + 50).stroke();
+      doc.moveDown(2.5);
 
-      doc.moveDown(4);
-      doc.font(B).fontSize(12)
-         .text('Land Selected By Following Company', 50, 320, { align: 'center', underline: true });
-      doc.moveDown(2);
+      doc.font(B).fontSize(12).fillColor('black')
+         .text('Land Selected By Following Company', 50, doc.y, { align: 'center', underline: true, width: 495 });
+      doc.moveDown(1.5);
 
-      doc.text('Land Requirement:',            150, 360);
-      doc.text(finalLandSize,                  300, 360, { underline: true });
-      doc.text('Cover Range:',                 150, 390);
-      doc.text('20 Miles',                     300, 390, { underline: true });
-      doc.text('Capacity Of Mobile Tower:',    150, 420);
-      doc.text('According to Space & Size',    300, 420, { underline: true });
-      doc.text('Vodafone Idea:',               150, 450);
-      doc.text('5G NETWORK',                   300, 450, { underline: true });
+      const landRows = [
+        ['Land Requirement :', finalLandSize],
+        ['Cover Range :', '20 Miles'],
+        ['Capacity Of Mobile Tower :', 'According to Space & Size'],
+        ['Vodafone Idea :', '5G NETWORK'],
+      ];
+      landRows.forEach(([label, value]) => {
+        const rowY = doc.y;
+        doc.font(B).fontSize(10).text(label, 100, rowY, { width: 180 });
+        doc.font(R).fontSize(10).text(value, 300, rowY, { underline: true, width: 200 });
+        doc.moveDown(0.9);
+      });
 
-      doc.moveDown(4);
-      doc.fontSize(10).font(I)
-         .text('Applicant Submitted Details (Chatbot Tracking):', 50, 520, { underline: true });
-      doc.font(R);
-      doc.text(`Name: ${finalName}`,         50, 540);
-      doc.text(`Mobile: ${mobile_no || 'N/A'}`, 50, 555);
-      doc.text(`Location: ${finalLocation}`, 50, 570);
-      doc.text(`State: ${finalState}`,       50, 585);
-      doc.text(`Pincode: ${pin_code || 'N/A'}`, 50, 600);
-      doc.text(`Land Size: ${finalLandSize}`,50, 615);
-      doc.text(`Ownership: ${finalOwnership}`,50, 630);
+      // Applicant details
+      doc.moveDown(1);
+      doc.fontSize(9).font(I).fillColor('#555')
+         .text('Applicant Submitted Details:', 50, doc.y, { underline: true });
+      doc.moveDown(0.5);
+      doc.font(R).fillColor('black').fontSize(9);
+      [
+        `Name: ${finalName}`,
+        `Mobile: ${mobile_no || 'N/A'}`,
+        `Location: ${finalLocation}`,
+        `State: ${finalState}`,
+        `Pincode: ${pin_code || 'N/A'}`,
+        `Land Size: ${finalLandSize}`,
+        `Ownership: ${finalOwnership}`,
+      ].forEach(line => { doc.text(line, 50, doc.y); doc.moveDown(0.4); });
 
-      // ── PAGE 3: COVERAGE MAPS 1 ───────────────────────────────────────────
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 3 – COVERAGE MAPS (Picture7 + Picture8)
+      // ═══════════════════════════════════════════════════════════════════════
       doc.addPage();
-      doc.rect(50, 30, 495, 60).stroke();
-      doc.fontSize(12).font(B).text('Department of Science & Technology', 60, 50, { align: 'center' });
-      doc.moveDown(4);
-      doc.fontSize(14).text('Survey Signal & Frequency Report - Part 1', { align: 'center' });
-      doc.moveDown(2);
 
-      doc.rect(100, 180, 400, 200).fillOpacity(0.1).fill('black');
-      doc.fillOpacity(1).rect(100, 180, 400, 200).stroke();
-      doc.fontSize(10).text('Signal Strength Graph (Simulation)', 110, 190);
-      doc.moveTo(120, 350).lineTo(480, 350).stroke();
-      doc.moveTo(120, 350).lineTo(120, 220).stroke();
-      doc.moveTo(120, 300).lineTo(180, 250).lineTo(250, 280).lineTo(350, 230).lineTo(450, 270).stroke('green');
+      drawWatermark(doc, assets.watermark);
+      drawPageHeader(doc, assets.hdrP2P3, 'Department of Science & Technology | Survey Report Part 1', B);
 
-      doc.rect(100, 420, 400, 200).fillOpacity(0.1).fill('black');
-      doc.fillOpacity(1).rect(100, 420, 400, 200).stroke();
-      doc.strokeColor('black').fontSize(10).text('Frequency Analysis (Simulation)', 110, 430);
-      doc.moveTo(120, 590).lineTo(480, 590).stroke();
-      doc.moveTo(120, 590).lineTo(120, 460).stroke();
-      doc.moveTo(120, 540).lineTo(180, 500).lineTo(250, 520).lineTo(350, 480).lineTo(450, 530).stroke('blue');
-      doc.strokeColor('black');
+      const p3y = doc.y + 10;
 
-      // ── PAGE 4: COVERAGE MAPS 2 ───────────────────────────────────────────
-      doc.addPage();
-      doc.rect(50, 30, 495, 60).stroke();
-      doc.fontSize(12).font(B).text('Department of Science & Technology', 60, 50, { align: 'center' });
-      doc.moveDown(4);
-      doc.fontSize(14).text('Survey Signal & Frequency Report - Part 2', { align: 'center' });
-      doc.moveDown(2);
-
-      doc.rect(100, 180, 400, 250).fillOpacity(0.1).fill('black');
-      doc.fillOpacity(1).rect(100, 180, 400, 250).stroke();
-      doc.fontSize(10).text('Network Coverage Spread', 110, 190);
-      for (let i = 0; i < 8; i++) {
-        doc.moveTo(120, 220 + i * 25).lineTo(480, 220 + i * 25).stroke('grey');
-        doc.moveTo(150 + i * 40, 200).lineTo(150 + i * 40, 400).stroke('grey');
+      if (assets.p3img1) {
+        try {
+          doc.image(assets.p3img1, 50, p3y, { width: 495, height: 310 });
+        } catch {
+          _drawFallbackChart(doc, 50, p3y, 495, 310, 'Signal Strength Graph (Simulation)', 'green');
+        }
+      } else {
+        _drawFallbackChart(doc, 50, p3y, 495, 310, 'Signal Strength Graph (Simulation)', 'green');
       }
-      doc.circle(300, 300, 40).fillOpacity(0.3).fill('green');
-      doc.circle(260, 280, 60).fillOpacity(0.2).fill('yellow');
-      doc.fillOpacity(1).strokeColor('black');
+
+      const p3y2 = p3y + 325;
+      if (assets.p3img2) {
+        try {
+          doc.image(assets.p3img2, 50, p3y2, { width: 495, height: 310 });
+        } catch {
+          _drawFallbackChart(doc, 50, p3y2, 495, 310, 'Frequency Analysis (Simulation)', 'blue');
+        }
+      } else {
+        _drawFallbackChart(doc, 50, p3y2, 495, 310, 'Frequency Analysis (Simulation)', 'blue');
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PAGE 4 – COVERAGE MAPS (Picture9 + Picture10)
+      // ═══════════════════════════════════════════════════════════════════════
+      doc.addPage();
+
+      drawWatermark(doc, assets.watermark);
+      // Page 4 has its own header image; fall back to Picture3 if unavailable
+      drawPageHeader(
+        doc,
+        assets.hdrP4 || assets.hdrP2P3,
+        'Department of Science & Technology | Survey Report Part 2',
+        B,
+      );
+
+      const p4y = doc.y + 10;
+
+      if (assets.p4img1) {
+        try {
+          doc.image(assets.p4img1, 50, p4y, { width: 495, height: 310 });
+        } catch {
+          _drawFallbackChart(doc, 50, p4y, 495, 310, 'Network Coverage Spread - Part 1', 'green');
+        }
+      } else {
+        _drawFallbackChart(doc, 50, p4y, 495, 310, 'Network Coverage Spread - Part 1', 'green');
+      }
+
+      const p4y2 = p4y + 325;
+      if (assets.p4img2) {
+        try {
+          doc.image(assets.p4img2, 50, p4y2, { width: 495, height: 310 });
+        } catch {
+          _drawFallbackChart(doc, 50, p4y2, 495, 310, 'Network Coverage Spread - Part 2', 'blue');
+        }
+      } else {
+        _drawFallbackChart(doc, 50, p4y2, 495, 310, 'Network Coverage Spread - Part 2', 'blue');
+      }
 
       doc.end();
     } catch (err) {
@@ -330,7 +415,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
   });
 }
 
-// ── Fallback vector helpers ───────────────────────────────────────────────────
+// ── Vector fallback helpers ───────────────────────────────────────────────────
 
 function _drawFallbackTower(doc: PDFKit.PDFDocument) {
   doc.save();
@@ -386,4 +471,26 @@ function _drawFallbackQR(doc: PDFKit.PDFDocument, x: number, y: number) {
   ];
   pts.forEach(([px, py]) => doc.rect(px, py, 4, 4).fill('black'));
   doc.restore();
+}
+
+function _drawFallbackChart(
+  doc: PDFKit.PDFDocument,
+  x: number, y: number,
+  w: number, h: number,
+  label: string,
+  color: string,
+) {
+  doc.rect(x, y, w, h).fillOpacity(0.05).fill('black');
+  doc.fillOpacity(1).rect(x, y, w, h).stroke();
+  doc.fontSize(10).text(label, x + 10, y + 10);
+  const midY = y + h - 30;
+  doc.moveTo(x + 20, midY).lineTo(x + w - 20, midY).stroke();
+  doc.moveTo(x + 20, midY).lineTo(x + 20, y + 20).stroke();
+  doc.moveTo(x + 20, midY - 50)
+     .lineTo(x + 80, midY - 100)
+     .lineTo(x + 160, midY - 60)
+     .lineTo(x + 280, midY - 120)
+     .lineTo(x + 400, midY - 80)
+     .stroke(color);
+  doc.strokeColor('black');
 }
