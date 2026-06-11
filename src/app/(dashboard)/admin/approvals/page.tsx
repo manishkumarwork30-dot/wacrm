@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,32 @@ export default function ApprovalsPage() {
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [isBulkGenerating, setIsBulkGenerating] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ count: number; errors: number } | null>(null);
+
+  const downloadTemplate = () => {
+    try {
+      const data = [
+        { Name: "Ramesh Kumar", District: "Lucknow" },
+        { Name: "Suresh Sharma", District: "Jaipur" },
+        { Name: "Priya Singh", District: "Patna" }
+      ];
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Approvals");
+      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "HTL_Bulk_Approval_Template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Template downloaded!");
+    } catch (err: any) {
+      toast.error("Failed to download template: " + err.message);
+    }
+  };
 
   useEffect(() => {
     async function fetchApprovals() {
@@ -249,13 +276,22 @@ export default function ApprovalsPage() {
           </div>
         )}
 
-        {/* Format hint */}
-        <p className="mt-3 text-xs text-slate-500">
-          💡 Max 100 rows per upload. Required columns:{" "}
-          <code className="bg-slate-800 px-1 rounded text-slate-300">Name</code>,{" "}
-          <code className="bg-slate-800 px-1 rounded text-slate-300">District</code>{" "}
-          (also accepts <code className="bg-slate-800 px-1 rounded text-slate-300">Location</code>)
-        </p>
+        {/* Format hint & Template download */}
+        <div className="mt-4 pt-3 border-t border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <p className="text-xs text-slate-500">
+            💡 Max 100 rows per upload. Required columns:{" "}
+            <code className="bg-slate-800 px-1 rounded text-slate-300">Name</code>,{" "}
+            <code className="bg-slate-800 px-1 rounded text-slate-300">District</code>{" "}
+            (also accepts <code className="bg-slate-800 px-1 rounded text-slate-300">Location</code>)
+          </p>
+          <button
+            onClick={downloadTemplate}
+            className="text-xs text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1.5 self-start sm:self-auto font-medium"
+          >
+            <Download className="h-3 w-3" />
+            Download Example Template
+          </button>
+        </div>
       </div>
 
       {/* ── Leads Table ────────────────────────────────────────────────────── */}
