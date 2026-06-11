@@ -238,21 +238,21 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       }
 
       if (assets.stamp) {
-        try { doc.image(assets.stamp, 55, signY + 60, { width: 80, height: 80 }); }
-        catch { _drawFallbackStamp(doc, 55, signY + 60); }
+        try { doc.image(assets.stamp, 50, signY + 60, { width: 80, height: 80 }); }
+        catch { _drawFallbackStamp(doc, 50, signY + 60); }
       } else {
-        _drawFallbackStamp(doc, 55, signY + 60);
+        _drawFallbackStamp(doc, 50, signY + 60);
       }
 
       const qrX = 420;
       doc.font(B).fontSize(7.5).fillColor('black')
-         .text('Please scan the bar code and check Approval', qrX - 10, signY, { width: 100, align: 'center' });
+         .text('Please scan the bar code and check Approval', qrX - 10, signY + 5, { width: 100, align: 'center' });
 
       if (assets.qr) {
-        try { doc.image(assets.qr, qrX, signY + 20, { width: 80, height: 80 }); }
-        catch { _drawFallbackQR(doc, qrX, signY + 20); }
+        try { doc.image(assets.qr, qrX, signY + 25, { width: 80, height: 80 }); }
+        catch { _drawFallbackQR(doc, qrX, signY + 25); }
       } else {
-        _drawFallbackQR(doc, qrX, signY + 20);
+        _drawFallbackQR(doc, qrX, signY + 25);
       }
 
       // Footer
