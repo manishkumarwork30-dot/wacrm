@@ -67,12 +67,19 @@ export default function ApprovalsPage() {
       });
       
       const data = await response.json();
+
+      // 202 = outside working hours (9 AM – 9 PM IST)
+      if (response.status === 202 && data.outsideWorkingHours) {
+        toast.error(`⏰ ${data.message}`, { duration: 6000 });
+        setIsModalOpen(false);
+        return;
+      }
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to send approval');
       }
       
-      toast.success("Approval PDF re-sent successfully!");
+      toast.success("Approval PDF sent successfully!");
       setIsModalOpen(false);
       
       // Update local state timestamp and status
@@ -89,6 +96,7 @@ export default function ApprovalsPage() {
       setIsSending(false);
     }
   };
+
 
   return (
     <div className="flex h-full flex-col p-6">

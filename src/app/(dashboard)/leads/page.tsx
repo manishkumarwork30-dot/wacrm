@@ -203,6 +203,13 @@ export default function LeadsPage() {
       });
       
       const data = await response.json();
+
+      // 202 = outside working hours (9 AM – 9 PM IST)
+      if (response.status === 202 && data.outsideWorkingHours) {
+        toast.error(`⏰ ${data.message}`, { duration: 6000 });
+        setIsModalOpen(false);
+        return;
+      }
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to send approval');
@@ -225,6 +232,7 @@ export default function LeadsPage() {
       setIsSending(false);
     }
   };
+
 
   return (
     <div className="flex flex-col gap-6">

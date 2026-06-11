@@ -5,6 +5,40 @@ import { sendDocumentMessage } from '@/lib/whatsapp/meta-api'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { decrypt } from '@/lib/whatsapp/encryption'
 
+// Working hours: 9:00 AM – 9:00 PM IST (UTC+5:30)
+const WORK_START_HOUR = 9   // 9 AM IST
+const WORK_END_HOUR   = 21  // 9 PM IST (21:00)
+const IST_OFFSET_MS   = 5.5 * 60 * 60 * 1000 // +05:30
+
+/**
+ * Returns true if the current IST time is within working hours (9 AM – 9 PM).
+ * Also returns the next available send time if outside working hours.
+ */
+function getWorkingHoursStatus(): { isWorkingHours: boolean; nextWindowIST: string } {
+  const nowUTC = Date.now()
+  const nowIST = new Date(nowUTC + IST_OFFSET_MS)
+  const hour   = nowIST.getUTCHours()   // IST hour (0-23)
+
+  if (hour >= WORK_START_HOUR && hour < WORK_END_HOUR) {
+    return { isWorkingHours: true, nextWindowIST: '' }
+  }
+
+  // Calculate next 9 AM IST
+  const nextIST = new Date(nowIST)
+  nextIST.setUTCHours(WORK_START_HOUR, 0, 0, 0)
+  if (hour >= WORK_END_HOUR) {
+    // After 9 PM — push to next calendar day
+    nextIST.setUTCDate(nextIST.getUTCDate() + 1)
+  }
+  // Format as readable IST string
+  const formatted = nextIST.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  })
+  return { isWorkingHours: false, nextWindowIST: formatted }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -48,6 +82,20 @@ export async function POST(
     if (!finalName || !finalLocation) {
       return NextResponse.json({ error: 'Name and Location are required to generate PDF' }, { status: 400 })
     }
+
+    // ── Working Hours Guard (9 AM – 9 PM IST) ──────────────────────────────
+    const { isWorkingHours, nextWindowIST } = getWorkingHoursStatus()
+    if (!isWorkingHours) {
+      return NextResponse.json(
+        {
+          success: false,
+          outsideWorkingHours: true,
+          message: `Approvals are sent between 9 AM and 9 PM IST only. Your approval for ${finalName} will be sent on ${nextWindowIST}.`,
+        },
+        { status: 202 }
+      )
+    }
+    // ──────────────────────────────────────────────────────────────────────
 
     // 3. Update the lead if the details were missing/changed
     if (finalName !== lead.name || finalLocation !== lead.location) {

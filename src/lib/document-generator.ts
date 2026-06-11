@@ -1,13 +1,20 @@
 import PDFDocument from 'pdfkit';
 
 /**
- * Module-level font cache so each warm serverless container only fetches
- * the TTF files once (Vercel functions stay warm between invocations).
+ * Module-level cache — warm serverless containers reuse these buffers
+ * across invocations without re-fetching from the network.
  */
 let _fontCache: {
   regular: Buffer | null;
   bold: Buffer | null;
   italic: Buffer | null;
+} | null = null;
+
+let _assetCache: {
+  logo: Buffer | null;
+  qr: Buffer | null;
+  signature: Buffer | null;
+  stamp: Buffer | null;
 } | null = null;
 
 const fetchBuffer = async (url: string): Promise<Buffer | null> => {
@@ -33,106 +40,102 @@ const getFonts = async () => {
   return _fontCache;
 };
 
+const getAssets = async () => {
+  if (_assetCache) return _assetCache;
+  const [logo, qr, signature, stamp] = await Promise.all([
+    fetchBuffer('https://htlnetwork.com/assets/images/logo.png'),
+    fetchBuffer('https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png'),
+    fetchBuffer('https://i.ibb.co/Fqj8CGm3/signature.png'),
+    fetchBuffer('https://i.ibb.co/v6cQ2rDC/approval-image.png'),
+  ]);
+  _assetCache = { logo, qr, signature, stamp };
+  return _assetCache;
+};
+
 /**
  * Generates a personalized 4-page PDF document for the qualified lead using PDFKit.
  * Matches the requested layout for the HTL Network Approval Letter.
  * Fonts are loaded from CDN (no filesystem AFM dependency – safe on Vercel).
  */
 export async function generateCongratulationsDoc(data: any): Promise<Uint8Array> {
-  const logoUrl =
-    'https://htlnetwork.com/assets/images/logo.png';
-  const qrUrl =
-    'https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png';
-
-  const [logoBuffer, qrBuffer, fonts] = await Promise.all([
-    fetchBuffer(logoUrl),
-    fetchBuffer(qrUrl),
-    getFonts(),
-  ]);
+  const [fonts, assets] = await Promise.all([getFonts(), getAssets()]);
 
   return new Promise((resolve, reject) => {
     try {
-      const { name, location, mobile_no, state, pin_code, land_size, ownership, date } = data;
-      const finalName = name || 'Applicant';
-      const finalLocation = location || 'Unknown District';
-      const finalState = state || 'Unknown State';
-      const finalLandSize = land_size || '225 sq.ft';
+      const {
+        name, location, mobile_no, state, pin_code, land_size, ownership, date,
+      } = data;
+      const finalName      = name      || 'Applicant';
+      const finalLocation  = location  || 'Unknown District';
+      const finalState     = state     || 'Unknown State';
+      const finalLandSize  = land_size || '225 sq.ft';
       const finalOwnership = ownership || data.is_owned || 'N/A';
 
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const buffers: Buffer[] = [];
-
       doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        resolve(new Uint8Array(pdfData));
-      });
+      doc.on('end', () => resolve(new Uint8Array(Buffer.concat(buffers))));
 
-      // Register custom TTF fonts (avoids Helvetica.afm filesystem lookup)
-      if (fonts.regular) doc.registerFont('Regular', fonts.regular);
-      if (fonts.bold)    doc.registerFont('Bold',    fonts.bold);
-      if (fonts.italic)  doc.registerFont('Italic',  fonts.italic);
+      // Register custom TTF fonts — eliminates Helvetica.afm filesystem lookup
+      if (fonts.regular) doc.registerFont('R', fonts.regular);
+      if (fonts.bold)    doc.registerFont('B', fonts.bold);
+      if (fonts.italic)  doc.registerFont('I', fonts.italic);
 
-      // Helpers
-      const R  = 'Regular';
-      const B  = 'Bold';
-      const I  = 'Italic';
+      const R = 'R';
+      const B = 'B';
+      const I = 'I';
 
-      // --- PAGE 1: APPROVAL LETTER ---
+      // ── PAGE 1: APPROVAL LETTER ───────────────────────────────────────────
 
       // Top-left Logo
-      if (logoBuffer) {
-        try {
-          doc.image(logoBuffer, 45, 25, { width: 60 });
-        } catch (logoErr) {
-          console.error('Failed to draw logo image:', logoErr);
-          _drawFallbackTower(doc);
-        }
+      if (assets.logo) {
+        try { doc.image(assets.logo, 45, 25, { width: 60 }); }
+        catch { _drawFallbackTower(doc); }
       } else {
         _drawFallbackTower(doc);
       }
 
-      // Company Title on the right of the header
+      // Company title (right of header)
       doc.save();
       doc.fillColor('#0000FF');
       doc.font(B).fontSize(36).text('HTL NETWORK', 130, 32, { characterSpacing: 1 });
       doc.restore();
 
-      // Divider line
+      // Header divider
       doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveDown(1);
 
       // Background logo watermark
-      doc.save();
-      if (logoBuffer) {
-        try {
-          doc.opacity(0.1);
-          doc.image(logoBuffer, 147, 280, { width: 300 });
-        } catch (bgErr) {
-          console.error('Failed to draw background logo:', bgErr);
-        }
+      if (assets.logo) {
+        doc.save();
+        try { doc.opacity(0.08).image(assets.logo, 147, 280, { width: 300 }); }
+        catch { /* skip watermark on error */ }
+        doc.restore();
       }
-      doc.restore();
 
-      // Title: APPROVAL LETTER
+      // APPROVAL LETTER title
       doc.moveDown(0.5);
-      doc.font(B).fontSize(12).fillColor('#0000FF').text('APPROVAL LETTER', { align: 'center', underline: true });
+      doc.font(B).fontSize(12).fillColor('#0000FF')
+         .text('APPROVAL LETTER', { align: 'center', underline: true });
       doc.moveDown(1.5);
 
       // Date
-      let formattedDate = '6/6/2026';
+      let formattedDate: string;
       if (date) {
         if (typeof date === 'string') {
-          if (date.includes('/')) {
-            formattedDate = date;
-          } else {
-            const parsed = new Date(date);
-            if (!isNaN(parsed.getTime())) {
-              formattedDate = `${parsed.getDate()}/${parsed.getMonth() + 1}/${parsed.getFullYear()}`;
-            }
-          }
+          formattedDate = date.includes('/')
+            ? date
+            : (() => {
+                const p = new Date(date);
+                return isNaN(p.getTime())
+                  ? date
+                  : `${p.getDate()}/${p.getMonth() + 1}/${p.getFullYear()}`;
+              })();
         } else if (date instanceof Date) {
           formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+        } else {
+          const now = new Date();
+          formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
         }
       } else {
         const now = new Date();
@@ -141,14 +144,14 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.font(R).fontSize(10).fillColor('black').text(`Date :${formattedDate}`);
       doc.moveDown(1.5);
 
-      // Salutation & Details
+      // Salutation
       doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD');
       doc.moveDown(1);
       doc.font(B).fontSize(11).text(`Mr. ${finalName}`);
       doc.font(B).fontSize(11).text(`District ${finalLocation}`);
       doc.moveDown(1.5);
 
-      // Body Paragraphs
+      // Body paragraphs
       doc.font(R).fontSize(9.5).fillColor('black');
       doc.text(
         `HTL NETWORK PVT. LTD. is looking for tower location across different state in India. We are very glad to inform that VI 5G NETWORK has agreed to install its NETWORK Tower with the given referenceDDD/KG/1044J/05G on the land referred by you. On the basis of your documents and suitability of your land space, the issue to be held. The agreement period is for 20 years and can be extend for further 15 years, if both parties agreed. In case of expanding of tower maturity period, the term and condition will be according to policies of the company in the financial year and laws of the government. After issued of your License certificate, our company will provide you a sum of Rs. 70 lacs as advance and rent of first month. During the agreement period the sum of Rs.60,000/-per month will be allocated for as rent with an increment of 10% per year (Out of rent allotted, 30,000 will be credited to your account and rest 30,000 will be deducted as EMI on 70 lacs Advance so that amount will be recovered within 20 years agreement\'s time period) and Rs. 22000/- as salary for security Guard. All the rule and regulation will be governed by companies ACT 1956 in case of any legal procedure.`,
@@ -172,40 +175,36 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       );
       doc.moveDown(3);
 
-      // Footer and signatures section
+      // ── Signature / Stamp / QR section ───────────────────────────────────
       const signY = doc.y;
 
-      // Left: Authorized Signatory with simulated stamp & signature
-      doc.font(B).fontSize(10).text('Authorized Signatory', 50, signY);
+      // Left: Authorized Signatory label
+      doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 50, signY);
 
-      // Drawing simulated signature path
-      doc.save();
-      doc.strokeColor('#1e3a8a').lineWidth(1.5);
-      doc.moveTo(55, signY + 30).bezierCurveTo(70, signY + 15, 80, signY + 45, 95, signY + 25)
-         .bezierCurveTo(105, signY + 15, 110, signY + 35, 125, signY + 20).stroke();
-      doc.restore();
+      // Real signature image (or vector fallback)
+      if (assets.signature) {
+        try { doc.image(assets.signature, 50, signY + 18, { width: 90, height: 40 }); }
+        catch { _drawFallbackSignature(doc, signY); }
+      } else {
+        _drawFallbackSignature(doc, signY);
+      }
 
-      // Approved Stamp
-      doc.save();
-      doc.translate(130, signY + 15);
-      doc.strokeColor('#dc2626').lineWidth(2);
-      doc.circle(20, 20, 22).stroke();
-      doc.circle(20, 20, 19).stroke();
-      doc.fillColor('#dc2626').font(B).fontSize(6).text('APPROVED', 5, 17, { width: 30, align: 'center' });
-      doc.restore();
+      // Real approval stamp image (or vector fallback)
+      if (assets.stamp) {
+        try { doc.image(assets.stamp, 155, signY, { width: 80, height: 80 }); }
+        catch { _drawFallbackStamp(doc, signY); }
+      } else {
+        _drawFallbackStamp(doc, signY);
+      }
 
-      // Right: QR Code and Scanning text
+      // Right side: scan text + QR code
       const qrX = 420;
-      doc.font(B).fontSize(9).text('Please scan the bar code and check Approval', 220, signY, { width: 190, align: 'right' });
+      doc.font(B).fontSize(9).fillColor('black')
+         .text('Please scan the bar code and check Approval', 250, signY, { width: 165, align: 'right' });
 
-      // Draw QR Code
-      if (qrBuffer) {
-        try {
-          doc.image(qrBuffer, qrX, signY + 10, { width: 80, height: 80 });
-        } catch (qrErr) {
-          console.error('Failed to draw QR image:', qrErr);
-          _drawFallbackQR(doc, qrX, signY + 10);
-        }
+      if (assets.qr) {
+        try { doc.image(assets.qr, qrX, signY + 10, { width: 80, height: 80 }); }
+        catch { _drawFallbackQR(doc, qrX, signY + 10); }
       } else {
         _drawFallbackQR(doc, qrX, signY + 10);
       }
@@ -219,9 +218,8 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       );
       doc.restore();
 
-      // --- PAGE 2: SURVEY REPORT ---
+      // ── PAGE 2: SURVEY REPORT ─────────────────────────────────────────────
       doc.addPage();
-
       doc.rect(50, 30, 495, 60).stroke();
       doc.fontSize(12).font(B).text('Department of Science & Technology', 60, 50, { align: 'center' });
       doc.fontSize(10).font(R).text('Survey of India', 60, 65, { align: 'center' });
@@ -237,96 +235,82 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       );
       doc.moveDown(2);
 
-      // Table Headers
       const tableTop = 230;
       doc.rect(50, tableTop, 495, 25).stroke();
-      doc.font(B).text('LAND', 50, tableTop + 8, { width: 120, align: 'center' });
-      doc.text('GOVERNMENT REPORT', 170, tableTop + 8, { width: 150, align: 'center' });
-      doc.text('GEO POSITION', 320, tableTop + 8, { width: 100, align: 'center' });
-      doc.text('REQUIREMENT', 420, tableTop + 8, { width: 125, align: 'center' });
+      doc.font(B).text('LAND',              50,  tableTop + 8, { width: 120, align: 'center' });
+      doc.text('GOVERNMENT REPORT',         170, tableTop + 8, { width: 150, align: 'center' });
+      doc.text('GEO POSITION',              320, tableTop + 8, { width: 100, align: 'center' });
+      doc.text('REQUIREMENT',               420, tableTop + 8, { width: 125, align: 'center' });
 
-      // Table Row
       doc.rect(50, tableTop + 25, 495, 25).stroke();
-      doc.font(R).text('APPROVED', 50, tableTop + 33, { width: 120, align: 'center' });
-      doc.text('CONFIRM', 170, tableTop + 33, { width: 150, align: 'center' });
-      doc.text('VERY GOOD', 320, tableTop + 33, { width: 100, align: 'center' });
-      doc.text('YES', 420, tableTop + 33, { width: 125, align: 'center' });
+      doc.font(R).text('APPROVED',  50,  tableTop + 33, { width: 120, align: 'center' });
+      doc.text('CONFIRM',           170, tableTop + 33, { width: 150, align: 'center' });
+      doc.text('VERY GOOD',         320, tableTop + 33, { width: 100, align: 'center' });
+      doc.text('YES',               420, tableTop + 33, { width: 125, align: 'center' });
 
-      // Vertical lines for table
       doc.moveTo(170, tableTop).lineTo(170, tableTop + 50).stroke();
       doc.moveTo(320, tableTop).lineTo(320, tableTop + 50).stroke();
       doc.moveTo(420, tableTop).lineTo(420, tableTop + 50).stroke();
 
       doc.moveDown(4);
-
-      doc.font(B).fontSize(12).text('Land Selected By Following Company', 50, 320, { align: 'center', underline: true });
+      doc.font(B).fontSize(12)
+         .text('Land Selected By Following Company', 50, 320, { align: 'center', underline: true });
       doc.moveDown(2);
 
-      doc.text(`Land Requirement:`, 150, 360);
-      doc.text(`${finalLandSize}`, 300, 360, { underline: true });
-
-      doc.text(`Cover Range:`, 150, 390);
-      doc.text(`20 Miles`, 300, 390, { underline: true });
-
-      doc.text(`Capacity Of Mobile Tower:`, 150, 420);
-      doc.text(`According to Space & Size`, 300, 420, { underline: true });
-
-      doc.text(`Vodafone Idea:`, 150, 450);
-      doc.text(`5G NETWORK`, 300, 450, { underline: true });
+      doc.text('Land Requirement:',            150, 360);
+      doc.text(finalLandSize,                  300, 360, { underline: true });
+      doc.text('Cover Range:',                 150, 390);
+      doc.text('20 Miles',                     300, 390, { underline: true });
+      doc.text('Capacity Of Mobile Tower:',    150, 420);
+      doc.text('According to Space & Size',    300, 420, { underline: true });
+      doc.text('Vodafone Idea:',               150, 450);
+      doc.text('5G NETWORK',                   300, 450, { underline: true });
 
       doc.moveDown(4);
-      doc.fontSize(10).font(I).text('Applicant Submitted Details (Chatbot Tracking):', 50, 520, { underline: true });
-      doc.moveDown(1);
-      doc.font(R).text(`Name: ${finalName}`, 50, 540);
+      doc.fontSize(10).font(I)
+         .text('Applicant Submitted Details (Chatbot Tracking):', 50, 520, { underline: true });
+      doc.font(R);
+      doc.text(`Name: ${finalName}`,         50, 540);
       doc.text(`Mobile: ${mobile_no || 'N/A'}`, 50, 555);
       doc.text(`Location: ${finalLocation}`, 50, 570);
-      doc.text(`State: ${finalState}`, 50, 585);
+      doc.text(`State: ${finalState}`,       50, 585);
       doc.text(`Pincode: ${pin_code || 'N/A'}`, 50, 600);
-      doc.text(`Land Size: ${finalLandSize}`, 50, 615);
-      doc.text(`Ownership: ${finalOwnership}`, 50, 630);
+      doc.text(`Land Size: ${finalLandSize}`,50, 615);
+      doc.text(`Ownership: ${finalOwnership}`,50, 630);
 
-      // --- PAGE 3: COVERAGE MAPS 1 ---
+      // ── PAGE 3: COVERAGE MAPS 1 ───────────────────────────────────────────
       doc.addPage();
       doc.rect(50, 30, 495, 60).stroke();
       doc.fontSize(12).font(B).text('Department of Science & Technology', 60, 50, { align: 'center' });
-
       doc.moveDown(4);
       doc.fontSize(14).text('Survey Signal & Frequency Report - Part 1', { align: 'center' });
       doc.moveDown(2);
 
-      // Mock Chart 1
       doc.rect(100, 180, 400, 200).fillOpacity(0.1).fill('black');
-      doc.fillOpacity(1);
-      doc.rect(100, 180, 400, 200).stroke();
+      doc.fillOpacity(1).rect(100, 180, 400, 200).stroke();
       doc.fontSize(10).text('Signal Strength Graph (Simulation)', 110, 190);
       doc.moveTo(120, 350).lineTo(480, 350).stroke();
       doc.moveTo(120, 350).lineTo(120, 220).stroke();
       doc.moveTo(120, 300).lineTo(180, 250).lineTo(250, 280).lineTo(350, 230).lineTo(450, 270).stroke('green');
 
-      // Mock Chart 2
       doc.rect(100, 420, 400, 200).fillOpacity(0.1).fill('black');
-      doc.fillOpacity(1);
-      doc.rect(100, 420, 400, 200).stroke();
-      doc.strokeColor('black');
-      doc.fontSize(10).text('Frequency Analysis (Simulation)', 110, 430);
+      doc.fillOpacity(1).rect(100, 420, 400, 200).stroke();
+      doc.strokeColor('black').fontSize(10).text('Frequency Analysis (Simulation)', 110, 430);
       doc.moveTo(120, 590).lineTo(480, 590).stroke();
       doc.moveTo(120, 590).lineTo(120, 460).stroke();
       doc.moveTo(120, 540).lineTo(180, 500).lineTo(250, 520).lineTo(350, 480).lineTo(450, 530).stroke('blue');
       doc.strokeColor('black');
 
-      // --- PAGE 4: COVERAGE MAPS 2 ---
+      // ── PAGE 4: COVERAGE MAPS 2 ───────────────────────────────────────────
       doc.addPage();
       doc.rect(50, 30, 495, 60).stroke();
       doc.fontSize(12).font(B).text('Department of Science & Technology', 60, 50, { align: 'center' });
-
       doc.moveDown(4);
       doc.fontSize(14).text('Survey Signal & Frequency Report - Part 2', { align: 'center' });
       doc.moveDown(2);
 
-      // Mock Chart 3
       doc.rect(100, 180, 400, 250).fillOpacity(0.1).fill('black');
-      doc.fillOpacity(1);
-      doc.rect(100, 180, 400, 250).stroke();
+      doc.fillOpacity(1).rect(100, 180, 400, 250).stroke();
       doc.fontSize(10).text('Network Coverage Spread', 110, 190);
       for (let i = 0; i < 8; i++) {
         doc.moveTo(120, 220 + i * 25).lineTo(480, 220 + i * 25).stroke('grey');
@@ -343,12 +327,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
   });
 }
 
-// ── Fallback helpers ──────────────────────────────────────────────────────────
+// ── Fallback vector helpers ───────────────────────────────────────────────────
 
 function _drawFallbackTower(doc: PDFKit.PDFDocument) {
   doc.save();
-  doc.translate(45, 30);
-  doc.lineWidth(1.5).strokeColor('#2563eb');
+  doc.translate(45, 30).lineWidth(1.5).strokeColor('#2563eb');
   doc.moveTo(15, 45).lineTo(25, 10).lineTo(35, 45).stroke();
   doc.moveTo(22, 22).lineTo(28, 22).stroke();
   doc.moveTo(19, 33).lineTo(31, 33).stroke();
@@ -359,17 +342,36 @@ function _drawFallbackTower(doc: PDFKit.PDFDocument) {
   doc.restore();
 }
 
+function _drawFallbackSignature(doc: PDFKit.PDFDocument, signY: number) {
+  doc.save();
+  doc.strokeColor('#1e3a8a').lineWidth(1.5);
+  doc.moveTo(55, signY + 30)
+     .bezierCurveTo(70, signY + 15, 80, signY + 45, 95, signY + 25)
+     .bezierCurveTo(105, signY + 15, 110, signY + 35, 125, signY + 20)
+     .stroke();
+  doc.restore();
+}
+
+function _drawFallbackStamp(doc: PDFKit.PDFDocument, signY: number) {
+  doc.save();
+  doc.translate(155, signY + 10);
+  doc.strokeColor('#dc2626').lineWidth(2);
+  doc.circle(30, 30, 28).stroke();
+  doc.circle(30, 30, 25).stroke();
+  doc.fillColor('#dc2626').fontSize(7).text('APPROVED', 10, 26, { width: 40, align: 'center' });
+  doc.restore();
+}
+
 function _drawFallbackQR(doc: PDFKit.PDFDocument, x: number, y: number) {
   doc.save();
-  doc.translate(x, y);
-  doc.strokeColor('black').lineWidth(1.5);
+  doc.translate(x, y).strokeColor('black').lineWidth(1.5);
   doc.rect(0, 0, 80, 80).stroke();
-  const drawFinder = (fx: number, fy: number) => {
+  const finder = (fx: number, fy: number) => {
     doc.rect(fx, fy, 20, 20).fill('black');
     doc.rect(fx + 3, fy + 3, 14, 14).fill('white');
     doc.rect(fx + 6, fy + 6, 8, 8).fill('black');
   };
-  drawFinder(4, 4); drawFinder(56, 4); drawFinder(4, 56);
+  finder(4, 4); finder(56, 4); finder(4, 56);
   doc.fill('black');
   const pts = [
     [28,4],[32,4],[40,4],[44,4],[28,8],[36,8],[48,8],[28,12],[32,12],[40,12],[44,12],
@@ -377,7 +379,7 @@ function _drawFallbackQR(doc: PDFKit.PDFDocument, x: number, y: number) {
     [12,32],[20,32],[28,32],[40,32],[48,32],[60,32],
     [4,36],[16,36],[24,36],[32,36],[48,36],[56,36],[64,36],
     [8,40],[28,40],[36,40],[44,40],[60,40],
-    [56,48],[60,48],[68,48],[56,56],[64,56],[72,56],[60,60],[68,60],[56,68],[64,68],[72,68]
+    [56,48],[60,48],[68,48],[56,56],[64,56],[72,56],[60,60],[68,60],[56,68],[64,68],[72,68],
   ];
   pts.forEach(([px, py]) => doc.rect(px, py, 4, 4).fill('black'));
   doc.restore();
