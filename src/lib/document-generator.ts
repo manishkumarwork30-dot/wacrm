@@ -76,14 +76,17 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.on('data', buffers.push.bind(buffers));
       doc.on('end', () => resolve(new Uint8Array(Buffer.concat(buffers))));
 
-      // Register custom TTF fonts — eliminates Helvetica.afm filesystem lookup
+      // Register custom TTF fonts when available (Vercel/CDN).
+      // Fall back to built-in Helvetica when running locally (has .afm files).
       if (fonts.regular) doc.registerFont('R', fonts.regular);
       if (fonts.bold)    doc.registerFont('B', fonts.bold);
       if (fonts.italic)  doc.registerFont('I', fonts.italic);
 
-      const R = 'R';
-      const B = 'B';
-      const I = 'I';
+      // Use registered names when available, else built-in PDF standard fonts
+      const R = fonts.regular ? 'R' : 'Helvetica';
+      const B = fonts.bold    ? 'B' : 'Helvetica-Bold';
+      const I = fonts.italic  ? 'I' : 'Helvetica-Oblique';
+
 
       // ── PAGE 1: APPROVAL LETTER ───────────────────────────────────────────
 
