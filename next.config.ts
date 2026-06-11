@@ -54,6 +54,9 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./node_modules/pdfkit/js/data/**/*.afm'],
+  },
   /**
    * Cache-Control policy.
 
