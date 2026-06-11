@@ -348,27 +348,29 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       drawWatermark(doc, assets.watermark);
       drawPageHeader(doc, assets.hdrP2P3, 'Department of Science & Technology | Survey Report Part 1', B);
 
-      const p3y = doc.y + 10;
+      // Images centred horizontally: (595 - 400) / 2 = 97.5 → 97
+      const imgX = 97;
+      const p3y  = doc.y + 10;
 
       if (assets.p3img1) {
         try {
-          doc.image(assets.p3img1, 50, p3y, { width: 495, height: 310 });
+          doc.image(assets.p3img1, imgX, p3y, { width: 400, height: 400 });
         } catch {
-          _drawFallbackChart(doc, 50, p3y, 495, 310, 'Signal Strength Graph (Simulation)', 'green');
+          _drawFallbackChart(doc, imgX, p3y, 400, 400, 'Signal Strength Graph (Simulation)', 'green');
         }
       } else {
-        _drawFallbackChart(doc, 50, p3y, 495, 310, 'Signal Strength Graph (Simulation)', 'green');
+        _drawFallbackChart(doc, imgX, p3y, 400, 400, 'Signal Strength Graph (Simulation)', 'green');
       }
 
-      const p3y2 = p3y + 325;
+      const p3y2 = p3y + 415; // 400px image + 15px gap
       if (assets.p3img2) {
         try {
-          doc.image(assets.p3img2, 50, p3y2, { width: 495, height: 310 });
+          doc.image(assets.p3img2, imgX, p3y2, { width: 400, height: 400 });
         } catch {
-          _drawFallbackChart(doc, 50, p3y2, 495, 310, 'Frequency Analysis (Simulation)', 'blue');
+          _drawFallbackChart(doc, imgX, p3y2, 400, 400, 'Frequency Analysis (Simulation)', 'blue');
         }
       } else {
-        _drawFallbackChart(doc, 50, p3y2, 495, 310, 'Frequency Analysis (Simulation)', 'blue');
+        _drawFallbackChart(doc, imgX, p3y2, 400, 400, 'Frequency Analysis (Simulation)', 'blue');
       }
 
       // ═══════════════════════════════════════════════════════════════════════
@@ -377,35 +379,30 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.addPage();
 
       drawWatermark(doc, assets.watermark);
-      // Page 4 has its own header image; fall back to Picture3 if unavailable
-      drawPageHeader(
-        doc,
-        assets.hdrP4 || assets.hdrP2P3,
-        'Department of Science & Technology | Survey Report Part 2',
-        B,
-      );
+      // Page 4: NO header – images start from top margin
 
-      const p4y = doc.y + 10;
+      const p4imgX = 97; // centred on A4
+      const p4y    = 30; // start near top of page
 
       if (assets.p4img1) {
         try {
-          doc.image(assets.p4img1, 50, p4y, { width: 495, height: 310 });
+          doc.image(assets.p4img1, p4imgX, p4y, { width: 400, height: 400 });
         } catch {
-          _drawFallbackChart(doc, 50, p4y, 495, 310, 'Network Coverage Spread - Part 1', 'green');
+          _drawFallbackChart(doc, p4imgX, p4y, 400, 400, 'Network Coverage Spread - Part 1', 'green');
         }
       } else {
-        _drawFallbackChart(doc, 50, p4y, 495, 310, 'Network Coverage Spread - Part 1', 'green');
+        _drawFallbackChart(doc, p4imgX, p4y, 400, 400, 'Network Coverage Spread - Part 1', 'green');
       }
 
-      const p4y2 = p4y + 325;
+      const p4y2 = p4y + 415; // 400px image + 15px gap
       if (assets.p4img2) {
         try {
-          doc.image(assets.p4img2, 50, p4y2, { width: 495, height: 310 });
+          doc.image(assets.p4img2, p4imgX, p4y2, { width: 400, height: 400 });
         } catch {
-          _drawFallbackChart(doc, 50, p4y2, 495, 310, 'Network Coverage Spread - Part 2', 'blue');
+          _drawFallbackChart(doc, p4imgX, p4y2, 400, 400, 'Network Coverage Spread - Part 2', 'blue');
         }
       } else {
-        _drawFallbackChart(doc, 50, p4y2, 495, 310, 'Network Coverage Spread - Part 2', 'blue');
+        _drawFallbackChart(doc, p4imgX, p4y2, 400, 400, 'Network Coverage Spread - Part 2', 'blue');
       }
 
       doc.end();
