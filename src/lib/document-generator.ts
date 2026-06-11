@@ -218,11 +218,12 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
         { align: 'justify', lineGap: 3 }
       );
+      doc.moveDown(1.5);
       doc.text(
         `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
         { align: 'justify', lineGap: 3 }
       );
-      doc.moveDown(3);
+      doc.moveDown(2);
 
       // Signature / Stamp / QR row
       const signY = doc.y;
@@ -230,28 +231,28 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 50, signY);
 
       if (assets.signature) {
-        try { doc.image(assets.signature, 50, signY + 18, { width: 90, height: 40 }); }
-        catch { _drawFallbackSignature(doc, signY); }
+        try { doc.image(assets.signature, 50, signY + 15, { width: 90, height: 40 }); }
+        catch { _drawFallbackSignature(doc, 50, signY + 15); }
       } else {
-        _drawFallbackSignature(doc, signY);
+        _drawFallbackSignature(doc, 50, signY + 15);
       }
 
       if (assets.stamp) {
-        try { doc.image(assets.stamp, 155, signY, { width: 80, height: 80 }); }
-        catch { _drawFallbackStamp(doc, signY); }
+        try { doc.image(assets.stamp, 55, signY + 60, { width: 80, height: 80 }); }
+        catch { _drawFallbackStamp(doc, 55, signY + 60); }
       } else {
-        _drawFallbackStamp(doc, signY);
+        _drawFallbackStamp(doc, 55, signY + 60);
       }
 
       const qrX = 420;
-      doc.font(B).fontSize(9).fillColor('black')
-         .text('Please scan the bar code and check Approval', 250, signY, { width: 165, align: 'right' });
+      doc.font(B).fontSize(7.5).fillColor('black')
+         .text('Please scan the bar code and check Approval', qrX - 10, signY, { width: 100, align: 'center' });
 
       if (assets.qr) {
-        try { doc.image(assets.qr, qrX, signY + 10, { width: 80, height: 80 }); }
-        catch { _drawFallbackQR(doc, qrX, signY + 10); }
+        try { doc.image(assets.qr, qrX, signY + 20, { width: 80, height: 80 }); }
+        catch { _drawFallbackQR(doc, qrX, signY + 20); }
       } else {
-        _drawFallbackQR(doc, qrX, signY + 10);
+        _drawFallbackQR(doc, qrX, signY + 20);
       }
 
       // Footer
@@ -379,10 +380,12 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.addPage();
 
       drawWatermark(doc, assets.watermark);
-      // Page 4: NO header – images start from top margin
+
+      // Page 4: Draw heading image
+      drawPageHeader(doc, assets.hdrP4, 'Department of Science & Technology | Survey Report Part 2', B);
 
       const p4imgX = 97; // centred on A4
-      const p4y    = 30; // start near top of page
+      const p4y    = doc.y + 10;
 
       if (assets.p4img1) {
         try {
@@ -427,19 +430,19 @@ function _drawFallbackTower(doc: PDFKit.PDFDocument) {
   doc.restore();
 }
 
-function _drawFallbackSignature(doc: PDFKit.PDFDocument, signY: number) {
+function _drawFallbackSignature(doc: PDFKit.PDFDocument, x: number, y: number) {
   doc.save();
   doc.strokeColor('#1e3a8a').lineWidth(1.5);
-  doc.moveTo(55, signY + 30)
-     .bezierCurveTo(70, signY + 15, 80, signY + 45, 95, signY + 25)
-     .bezierCurveTo(105, signY + 15, 110, signY + 35, 125, signY + 20)
+  doc.moveTo(x + 5, y + 15)
+     .bezierCurveTo(x + 20, y, x + 30, y + 30, x + 45, y + 10)
+     .bezierCurveTo(x + 55, y, x + 60, y + 20, x + 75, y + 5)
      .stroke();
   doc.restore();
 }
 
-function _drawFallbackStamp(doc: PDFKit.PDFDocument, signY: number) {
+function _drawFallbackStamp(doc: PDFKit.PDFDocument, x: number, y: number) {
   doc.save();
-  doc.translate(155, signY + 10);
+  doc.translate(x, y);
   doc.strokeColor('#dc2626').lineWidth(2);
   doc.circle(30, 30, 28).stroke();
   doc.circle(30, 30, 25).stroke();
