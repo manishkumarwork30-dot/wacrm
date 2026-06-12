@@ -74,10 +74,10 @@ function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
   doc.save();
   try {
     doc.opacity(0.15);
-    // Make watermark very big and push it down to the visual middle
+    // Make watermark very big and centered vertically and horizontally
     const watermarkSize = 650;
     const x = (595.28 - watermarkSize) / 2;
-    const y = 250; 
+    const y = (841.89 - watermarkSize) / 2; 
     doc.image(buf, x, y, { width: watermarkSize });
   } catch { /* skip on image error */ }
   doc.restore();
@@ -152,7 +152,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Top-left Logo
       if (assets.logo) {
-        try { doc.image(assets.logo, 40, 20, { width: 150, height: 150 }); }
+        try { doc.image(assets.logo, 40, 20, { width: 100, height: 100 }); }
         catch { _drawFallbackTower(doc, 40, 20); }
       } else {
         _drawFallbackTower(doc, 40, 20);
@@ -161,8 +161,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       // Company title on the right
       doc.save();
       doc.fillColor('#1e3a8a'); // Professional dark blue
-      doc.font(B).fontSize(40).text('HTL NETWORK', 200, 60, { width: 355, align: 'right', characterSpacing: 2 });
-      doc.font(R).fontSize(12).fillColor('#475569').text('Telecommunication Infrastructure Solutions', 200, 110, { width: 355, align: 'right', characterSpacing: 1 });
+      doc.font(B).fontSize(40).text('HTL NETWORK', 200, 45, { width: 355, align: 'right', characterSpacing: 2 });
       doc.restore();
 
       // Header divider
@@ -198,44 +197,44 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`);
+      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 50, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD');
+      doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD', 50, doc.y);
       doc.moveDown(0.8);
-      doc.font(B).fontSize(11).text(`Mr. ${finalName}`);
-      doc.font(B).fontSize(11).text(`District ${finalLocation}`);
+      doc.font(B).fontSize(11).text(`Mr. ${finalName}`, 50, doc.y);
+      doc.font(B).fontSize(11).text(`District ${finalLocation}`, 50, doc.y);
       doc.moveDown(1.2);
 
       // Body paragraphs
       doc.font(R).fontSize(9.5).fillColor('black');
       doc.text(
         `HTL NETWORK PVT. LTD. is looking for tower location across different state in India. We are very glad to inform that VI 5G NETWORK has agreed to install its NETWORK Tower with the given referenceDDD/KG/1044J/05G on the land referred by you. On the basis of your documents and suitability of your land space, the issue to be held. The agreement period is for 20 years and can be extend for further 15 years, if both parties agreed. In case of expanding of tower maturity period, the term and condition will be according to policies of the company in the financial year and laws of the government. After issued of your License certificate, our company will provide you a sum of Rs. 70 lacs as advance and rent of first month. During the agreement period the sum of Rs.60,000/-per month will be allocated for as rent with an increment of 10% per year (Out of rent allotted, 30,000 will be credited to your account and rest 30,000 will be deducted as EMI on 70 lacs Advance so that amount will be recovered within 20 years agreement\'s time period) and Rs. 22000/- as salary for security Guard. All the rule and regulation will be governed by companies ACT 1956 in case of any legal procedure.`,
-        { align: 'justify', lineGap: 2.2 }
+        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
       );
       doc.moveDown(1.0);
       doc.text(
         `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
-        { align: 'justify', lineGap: 2.2 }
+        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
       );
       doc.moveDown(1.0);
       doc.text(
         `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
-        { align: 'justify', lineGap: 2.2 }
+        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
       );
       doc.moveDown(1.0);
       doc.text(
         `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
-        { align: 'justify', lineGap: 2.2 }
+        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
       );
-      doc.moveDown(1.8);
-
+      
       // Signature / Stamp / QR row
-      const signY = doc.y;
+      // Use fixed y-coordinate so they don't overlap text or footer
+      const signY = 620;
 
+      // 1. Signature on left
       doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 50, signY);
-
       if (assets.signature) {
         try { doc.image(assets.signature, 50, signY + 15, { width: 90, height: 40 }); }
         catch { _drawFallbackSignature(doc, 50, signY + 15); }
@@ -243,23 +242,24 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         _drawFallbackSignature(doc, 50, signY + 15);
       }
 
+      // 2. Stamp in the middle-left (moved so it doesn't overlap signature vertically)
       if (assets.stamp) {
-        try { doc.image(assets.stamp, 50, signY + 60, { width: 80, height: 80 }); }
-        catch { _drawFallbackStamp(doc, 50, signY + 60); }
+        try { doc.image(assets.stamp, 200, signY - 10, { width: 80, height: 80 }); }
+        catch { _drawFallbackStamp(doc, 200, signY - 10); }
       } else {
-        _drawFallbackStamp(doc, 50, signY + 60);
+        _drawFallbackStamp(doc, 200, signY - 10);
       }
 
+      // 3. QR code on the right
       const qrX = 420;
-      doc.font(B).fontSize(7.5).fillColor('black')
-         .text('Please scan the bar code and check Approval', qrX - 10, signY + 5, { width: 100, align: 'center' });
-
       if (assets.qr) {
-        try { doc.image(assets.qr, qrX, signY + 25, { width: 80, height: 80 }); }
-        catch { _drawFallbackQR(doc, qrX, signY + 25); }
+        try { doc.image(assets.qr, qrX, signY - 10, { width: 80, height: 80 }); }
+        catch { _drawFallbackQR(doc, qrX, signY - 10); }
       } else {
-        _drawFallbackQR(doc, qrX, signY + 25);
+        _drawFallbackQR(doc, qrX, signY - 10);
       }
+      doc.font(B).fontSize(7.5).fillColor('black')
+         .text('Please scan the bar code and check Approval', qrX - 10, signY + 75, { width: 100, align: 'center' });
 
       // Footer
       doc.save();
