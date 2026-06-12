@@ -165,11 +165,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.restore();
 
       // Header divider
-      doc.moveTo(40, 50).lineTo(555, 180).strokeColor('#2563eb').lineWidth(2).stroke();
-      // doc.moveTo(40, 50).lineTo(555, 184).strokeColor('#93c5fd').lineWidth(1).stroke();
+      doc.moveTo(40, 140).lineTo(555, 140).strokeColor('#2563eb').lineWidth(2).stroke();
+      // doc.moveTo(40, 144).lineTo(555, 144).strokeColor('#93c5fd').lineWidth(1).stroke();
 
       doc.x = 40;
-      doc.y = 200;
+      doc.y = 160;
 
       // APPROVAL LETTER title
       doc.font(B).fontSize(16).fillColor('#1e3a8a')
