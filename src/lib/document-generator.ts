@@ -152,7 +152,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Top-left Logo
       if (assets.logo) {
-        try { doc.image(assets.logo, 40, 20, { width: 100, height: 100 }); }
+        try { doc.image(assets.logo, 40, 20, { width: 150, height: 100 }); }
         catch { _drawFallbackTower(doc, 40, 20); }
       } else {
         _drawFallbackTower(doc, 40, 20);
@@ -165,8 +165,8 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.restore();
 
       // Header divider
-      doc.moveTo(40, 180).lineTo(555, 180).strokeColor('#2563eb').lineWidth(2).stroke();
-      doc.moveTo(40, 184).lineTo(555, 184).strokeColor('#93c5fd').lineWidth(1).stroke();
+      doc.moveTo(40, 50).lineTo(555, 180).strokeColor('#2563eb').lineWidth(2).stroke();
+      // doc.moveTo(40, 50).lineTo(555, 184).strokeColor('#93c5fd').lineWidth(1).stroke();
 
       doc.x = 40;
       doc.y = 200;
