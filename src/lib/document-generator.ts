@@ -75,9 +75,9 @@ function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
   try {
     doc.opacity(0.15);
     // Make watermark very big and centered vertically and horizontally
-    const watermarkSize = 650;
+    const watermarkSize = 450;
     const x = (595.28 - watermarkSize) / 2;
-    const y = (841.89 - watermarkSize) / 2; 
+    const y = (595.28 - watermarkSize) / 2;
     doc.image(buf, x, y, { width: watermarkSize });
   } catch { /* skip on image error */ }
   doc.restore();
@@ -123,10 +123,10 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         name, location, mobile_no, state, pin_code, land_size, ownership, date,
       } = data;
 
-      const finalName      = name      || 'Applicant';
-      const finalLocation  = location  || 'Unknown District';
-      const finalState     = state     || 'Unknown State';
-      const finalLandSize  = land_size || '225 sqft';
+      const finalName = name || 'Applicant';
+      const finalLocation = location || 'Unknown District';
+      const finalState = state || 'Unknown State';
+      const finalLandSize = land_size || '225 sqft';
       const finalOwnership = ownership || data.is_owned || 'N/A';
 
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -136,12 +136,12 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Register CDN fonts; fall back to built-in Helvetica when unavailable
       if (fonts.regular) doc.registerFont('R', fonts.regular);
-      if (fonts.bold)    doc.registerFont('B', fonts.bold);
-      if (fonts.italic)  doc.registerFont('I', fonts.italic);
+      if (fonts.bold) doc.registerFont('B', fonts.bold);
+      if (fonts.italic) doc.registerFont('I', fonts.italic);
 
       const R = fonts.regular ? 'R' : 'Helvetica';
-      const B = fonts.bold    ? 'B' : 'Helvetica-Bold';
-      const I = fonts.italic  ? 'I' : 'Helvetica-Oblique';
+      const B = fonts.bold ? 'B' : 'Helvetica-Bold';
+      const I = fonts.italic ? 'I' : 'Helvetica-Oblique';
 
       // ═══════════════════════════════════════════════════════════════════════
       // PAGE 1 – APPROVAL LETTER
@@ -167,13 +167,13 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       // Header divider
       doc.moveTo(40, 180).lineTo(555, 180).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveTo(40, 184).lineTo(555, 184).strokeColor('#93c5fd').lineWidth(1).stroke();
-      
+
       doc.x = 40;
       doc.y = 200;
 
       // APPROVAL LETTER title
       doc.font(B).fontSize(16).fillColor('#1e3a8a')
-         .text('LETTER OF APPROVAL', { align: 'center', underline: true });
+        .text('LETTER OF APPROVAL', { align: 'center', underline: true });
       doc.moveDown(1.5);
 
       // Date
@@ -184,11 +184,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
           formattedDate = date.includes('/')
             ? date
             : (() => {
-                const p = new Date(date);
-                return isNaN(p.getTime())
-                  ? `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
-                  : `${p.getDate()}/${p.getMonth() + 1}/${p.getFullYear()}`;
-              })();
+              const p = new Date(date);
+              return isNaN(p.getTime())
+                ? `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
+                : `${p.getDate()}/${p.getMonth() + 1}/${p.getFullYear()}`;
+            })();
         } else if (date instanceof Date) {
           formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
         } else {
@@ -229,7 +229,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
         40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
-      
+
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
       const signY = 620;
@@ -260,7 +260,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         _drawFallbackQR(doc, qrX, signY - 10);
       }
       doc.font(B).fontSize(7.5).fillColor('black')
-         .text('Please scan the bar code and check Approval', qrX - 10, signY + 75, { width: 100, align: 'center' });
+        .text('Please scan the bar code and check Approval', qrX - 10, signY + 75, { width: 100, align: 'center' });
 
       // Footer
       doc.save();
@@ -293,8 +293,8 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Survey table
       const tTop = doc.y;
-      const colW  = [120, 150, 100, 125];
-      const cols  = [50, 170, 320, 420];
+      const colW = [120, 150, 100, 125];
+      const cols = [50, 170, 320, 420];
 
       // Header row
       doc.rect(50, tTop, 495, 25).stroke();
@@ -316,7 +316,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveDown(2.5);
 
       doc.font(B).fontSize(12).fillColor('black')
-         .text('Land Selected By Following Company', 50, doc.y, { align: 'center', underline: true, width: 495 });
+        .text('Land Selected By Following Company', 50, doc.y, { align: 'center', underline: true, width: 495 });
       doc.moveDown(1.5);
 
       const landRows = [
@@ -335,7 +335,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       // Applicant details
       doc.moveDown(1);
       doc.fontSize(9).font(I).fillColor('#555')
-         .text('Applicant Submitted Details:', 50, doc.y, { underline: true });
+        .text('Applicant Submitted Details:', 50, doc.y, { underline: true });
       doc.moveDown(0.5);
       doc.font(R).fillColor('black').fontSize(9);
       [
@@ -358,7 +358,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Images centred horizontally: (595 - 400) / 2 = 97.5 → 97
       const imgX = 97;
-      const p3y  = doc.y + 10;
+      const p3y = doc.y + 10;
 
       if (assets.p3img1) {
         try {
@@ -392,7 +392,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       drawPageHeader(doc, assets.hdrP4, 'Department of Science & Technology | Survey Report Part 2', B);
 
       const p4imgX = 97; // centred on A4
-      const p4y    = doc.y + 10;
+      const p4y = doc.y + 10;
 
       if (assets.p4img1) {
         try {
@@ -430,7 +430,7 @@ function _drawFallbackTower(doc: PDFKit.PDFDocument, x: number, y: number) {
   doc.moveTo(15, 45).lineTo(25, 10).lineTo(35, 45).stroke();
   doc.moveTo(22, 22).lineTo(28, 22).stroke();
   doc.moveTo(19, 33).lineTo(31, 33).stroke();
-  (doc as any).arc(25, 10, 8,  Math.PI * 1.25, Math.PI * 1.75, false); doc.stroke();
+  (doc as any).arc(25, 10, 8, Math.PI * 1.25, Math.PI * 1.75, false); doc.stroke();
   (doc as any).arc(25, 10, 14, Math.PI * 1.25, Math.PI * 1.75, false); doc.stroke();
   (doc as any).arc(25, 10, 20, Math.PI * 1.25, Math.PI * 1.75, false); doc.stroke();
   doc.fillColor('black').fontSize(8).text('htlnetwork', 0, 50, { width: 50, align: 'center' });
@@ -441,9 +441,9 @@ function _drawFallbackSignature(doc: PDFKit.PDFDocument, x: number, y: number) {
   doc.save();
   doc.strokeColor('#1e3a8a').lineWidth(1.5);
   doc.moveTo(x + 5, y + 15)
-     .bezierCurveTo(x + 20, y, x + 30, y + 30, x + 45, y + 10)
-     .bezierCurveTo(x + 55, y, x + 60, y + 20, x + 75, y + 5)
-     .stroke();
+    .bezierCurveTo(x + 20, y, x + 30, y + 30, x + 45, y + 10)
+    .bezierCurveTo(x + 55, y, x + 60, y + 20, x + 75, y + 5)
+    .stroke();
   doc.restore();
 }
 
@@ -469,12 +469,12 @@ function _drawFallbackQR(doc: PDFKit.PDFDocument, x: number, y: number) {
   finder(4, 4); finder(56, 4); finder(4, 56);
   doc.fill('black');
   const pts = [
-    [28,4],[32,4],[40,4],[44,4],[28,8],[36,8],[48,8],[28,12],[32,12],[40,12],[44,12],
-    [4,28],[8,28],[16,28],[24,28],[36,28],[44,28],[56,28],[68,28],
-    [12,32],[20,32],[28,32],[40,32],[48,32],[60,32],
-    [4,36],[16,36],[24,36],[32,36],[48,36],[56,36],[64,36],
-    [8,40],[28,40],[36,40],[44,40],[60,40],
-    [56,48],[60,48],[68,48],[56,56],[64,56],[72,56],[60,60],[68,60],[56,68],[64,68],[72,68],
+    [28, 4], [32, 4], [40, 4], [44, 4], [28, 8], [36, 8], [48, 8], [28, 12], [32, 12], [40, 12], [44, 12],
+    [4, 28], [8, 28], [16, 28], [24, 28], [36, 28], [44, 28], [56, 28], [68, 28],
+    [12, 32], [20, 32], [28, 32], [40, 32], [48, 32], [60, 32],
+    [4, 36], [16, 36], [24, 36], [32, 36], [48, 36], [56, 36], [64, 36],
+    [8, 40], [28, 40], [36, 40], [44, 40], [60, 40],
+    [56, 48], [60, 48], [68, 48], [56, 56], [64, 56], [72, 56], [60, 60], [68, 60], [56, 68], [64, 68], [72, 68],
   ];
   pts.forEach(([px, py]) => doc.rect(px, py, 4, 4).fill('black'));
   doc.restore();
@@ -494,10 +494,10 @@ function _drawFallbackChart(
   doc.moveTo(x + 20, midY).lineTo(x + w - 20, midY).stroke();
   doc.moveTo(x + 20, midY).lineTo(x + 20, y + 20).stroke();
   doc.moveTo(x + 20, midY - 50)
-     .lineTo(x + 80, midY - 100)
-     .lineTo(x + 160, midY - 60)
-     .lineTo(x + 280, midY - 120)
-     .lineTo(x + 400, midY - 80)
-     .stroke(color);
+    .lineTo(x + 80, midY - 100)
+    .lineTo(x + 160, midY - 60)
+    .lineTo(x + 280, midY - 120)
+    .lineTo(x + 400, midY - 80)
+    .stroke(color);
   doc.strokeColor('black');
 }
