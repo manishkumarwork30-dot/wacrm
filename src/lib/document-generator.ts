@@ -73,9 +73,12 @@ function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
   if (!buf) return;
   doc.save();
   try {
-    doc.opacity(0.12);
-    // Make watermark big and cover the whole page (shifted up/left to remove empty borders)
-    doc.image(buf, -50, -50, { width: 695, height: 942 });
+    doc.opacity(0.15);
+    // Make watermark big and centered in the middle of the A4 page (595 x 842)
+    const watermarkSize = 450;
+    const x = (595.28 - watermarkSize) / 2;
+    const y = (841.89 - watermarkSize) / 2;
+    doc.image(buf, x, y, { width: watermarkSize });
   } catch { /* skip on image error */ }
   doc.restore();
 }
