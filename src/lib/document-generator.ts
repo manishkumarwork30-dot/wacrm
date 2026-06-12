@@ -168,6 +168,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.moveTo(40, 180).lineTo(555, 180).strokeColor('#2563eb').lineWidth(2).stroke();
       doc.moveTo(40, 184).lineTo(555, 184).strokeColor('#93c5fd').lineWidth(1).stroke();
       
+      doc.x = 40;
       doc.y = 200;
 
       // APPROVAL LETTER title
@@ -197,36 +198,36 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 50, doc.y);
+      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD', 50, doc.y);
+      doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
       doc.moveDown(0.8);
-      doc.font(B).fontSize(11).text(`Mr. ${finalName}`, 50, doc.y);
-      doc.font(B).fontSize(11).text(`District ${finalLocation}`, 50, doc.y);
+      doc.font(B).fontSize(11).text(`Mr. ${finalName}`, 40, doc.y);
+      doc.font(B).fontSize(11).text(`District ${finalLocation}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Body paragraphs
       doc.font(R).fontSize(9.5).fillColor('black');
       doc.text(
         `HTL NETWORK PVT. LTD. is looking for tower location across different state in India. We are very glad to inform that VI 5G NETWORK has agreed to install its NETWORK Tower with the given referenceDDD/KG/1044J/05G on the land referred by you. On the basis of your documents and suitability of your land space, the issue to be held. The agreement period is for 20 years and can be extend for further 15 years, if both parties agreed. In case of expanding of tower maturity period, the term and condition will be according to policies of the company in the financial year and laws of the government. After issued of your License certificate, our company will provide you a sum of Rs. 70 lacs as advance and rent of first month. During the agreement period the sum of Rs.60,000/-per month will be allocated for as rent with an increment of 10% per year (Out of rent allotted, 30,000 will be credited to your account and rest 30,000 will be deducted as EMI on 70 lacs Advance so that amount will be recovered within 20 years agreement\'s time period) and Rs. 22000/- as salary for security Guard. All the rule and regulation will be governed by companies ACT 1956 in case of any legal procedure.`,
-        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
+        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
-        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
+        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
-        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
+        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
-        50, doc.y, { align: 'justify', lineGap: 2.2, width: 495 }
+        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       
       // Signature / Stamp / QR row
@@ -234,12 +235,12 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       const signY = 620;
 
       // 1. Signature on left
-      doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 50, signY);
+      doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 40, signY);
       if (assets.signature) {
-        try { doc.image(assets.signature, 50, signY + 15, { width: 90, height: 40 }); }
-        catch { _drawFallbackSignature(doc, 50, signY + 15); }
+        try { doc.image(assets.signature, 40, signY + 15, { width: 90, height: 40 }); }
+        catch { _drawFallbackSignature(doc, 40, signY + 15); }
       } else {
-        _drawFallbackSignature(doc, 50, signY + 15);
+        _drawFallbackSignature(doc, 40, signY + 15);
       }
 
       // 2. Stamp in the middle-left (moved so it doesn't overlap signature vertically)
@@ -263,10 +264,10 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Footer
       doc.save();
-      doc.moveTo(50, 740).lineTo(545, 740).strokeColor('black').lineWidth(1.5).stroke();
+      doc.moveTo(40, 740).lineTo(555, 740).strokeColor('black').lineWidth(1.5).stroke();
       doc.font(B).fontSize(8).fillColor('black').text(
         'HTL NETWORK PVT. LTD. B/67, MALLESWARAM ROAD, 4th PHASE, MALLESWARAM INDUSTRIAL AREA, BANGALORE - 560003 INDIA',
-        50, 748, { align: 'center', width: 495 }
+        40, 748, { align: 'center', width: 515 }
       );
       doc.restore();
 
