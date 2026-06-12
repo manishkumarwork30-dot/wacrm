@@ -73,9 +73,9 @@ function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
   if (!buf) return;
   doc.save();
   try {
-    doc.opacity(0.12); // Slightly higher opacity for full-page watermark
-    // Full page A4 (595x842)
-    doc.image(buf, 0, 0, { width: 595, height: 842 });
+    doc.opacity(0.12);
+    // Make watermark big and cover the whole page (shifted up/left to remove empty borders)
+    doc.image(buf, -50, -50, { width: 695, height: 942 });
   } catch { /* skip on image error */ }
   doc.restore();
 }
@@ -155,11 +155,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
         _drawFallbackTower(doc, 40, 20);
       }
 
-      // Company title on the right of the logo
+      // Company title on the right
       doc.save();
       doc.fillColor('#1e3a8a'); // Professional dark blue
-      doc.font(B).fontSize(42).text('HTL NETWORK', 200, 60, { characterSpacing: 2 });
-      doc.font(R).fontSize(12).fillColor('#475569').text('Telecommunication Infrastructure Solutions', 205, 110, { characterSpacing: 1 });
+      doc.font(B).fontSize(40).text('HTL NETWORK', 200, 60, { width: 355, align: 'right', characterSpacing: 2 });
+      doc.font(R).fontSize(12).fillColor('#475569').text('Telecommunication Infrastructure Solutions', 200, 110, { width: 355, align: 'right', characterSpacing: 1 });
       doc.restore();
 
       // Header divider
