@@ -345,11 +345,10 @@ export default function ApprovalsPage() {
                     <td className="px-4 py-3 text-right">
                       <Button
                         size="sm"
-                        variant="outline"
                         onClick={() => handleSendApprovalClick(lead)}
-                        className="border-primary/20 hover:bg-primary hover:text-primary-foreground text-primary h-8"
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-900/20 border-0 h-8 font-medium transition-all"
                       >
-                        <Send className="w-3 h-3 mr-1" />
+                        <Send className="w-3.5 h-3.5 mr-1.5" />
                         {lead.status === "Approval Sent" ? "Resend" : "Send"}
                       </Button>
                     </td>

@@ -73,9 +73,9 @@ function drawWatermark(doc: PDFKit.PDFDocument, buf: Buffer | null) {
   if (!buf) return;
   doc.save();
   try {
-    doc.opacity(0.06); // lighter opacity for full-page watermark
-    // Center it on the A4 page (595x842)
-    doc.image(buf, 47, 121, { width: 500, height: 600 });
+    doc.opacity(0.12); // Slightly higher opacity for full-page watermark
+    // Full page A4 (595x842)
+    doc.image(buf, 0, 0, { width: 595, height: 842 });
   } catch { /* skip on image error */ }
   doc.restore();
 }
@@ -149,26 +149,28 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Top-left Logo
       if (assets.logo) {
-        try { doc.image(assets.logo, 45, 25, { width: 60 }); }
-        catch { _drawFallbackTower(doc, 45, 25); }
+        try { doc.image(assets.logo, 40, 20, { width: 150, height: 150 }); }
+        catch { _drawFallbackTower(doc, 40, 20); }
       } else {
-        _drawFallbackTower(doc, 45, 25);
+        _drawFallbackTower(doc, 40, 20);
       }
 
       // Company title on the right of the logo
       doc.save();
-      doc.fillColor('#0000FF');
-      doc.font(B).fontSize(36).text('HTL NETWORK', 130, 32, { characterSpacing: 1 });
+      doc.fillColor('#1e3a8a'); // Professional dark blue
+      doc.font(B).fontSize(42).text('HTL NETWORK', 200, 60, { characterSpacing: 2 });
+      doc.font(R).fontSize(12).fillColor('#475569').text('Telecommunication Infrastructure Solutions', 205, 110, { characterSpacing: 1 });
       doc.restore();
 
       // Header divider
-      doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#2563eb').lineWidth(2).stroke();
-      doc.moveDown(1);
+      doc.moveTo(40, 180).lineTo(555, 180).strokeColor('#2563eb').lineWidth(2).stroke();
+      doc.moveTo(40, 184).lineTo(555, 184).strokeColor('#93c5fd').lineWidth(1).stroke();
+      
+      doc.y = 200;
 
       // APPROVAL LETTER title
-      doc.moveDown(0.5);
-      doc.font(B).fontSize(12).fillColor('#0000FF')
-         .text('APPROVAL LETTER', { align: 'center', underline: true });
+      doc.font(B).fontSize(16).fillColor('#1e3a8a')
+         .text('LETTER OF APPROVAL', { align: 'center', underline: true });
       doc.moveDown(1.5);
 
       // Date
