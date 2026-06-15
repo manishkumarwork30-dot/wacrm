@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendTextMessage, sendDocumentMessage } from './meta-api';
+import { sendTextMessage, sendDocumentMessage, sendInteractiveButtons } from './meta-api';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { generateCongratulationsDoc } from '@/lib/document-generator';
 
@@ -49,6 +49,26 @@ async function sendAndLogBotMessage(
     accessToken,
     to,
     text,
+  });
+  await logBotMessage(conversationId, text, sent.messageId);
+  return sent;
+}
+
+// Helper to send interactive buttons and log
+async function sendAndLogInteractiveButtons(
+  conversationId: string,
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  text: string,
+  buttons: { id: string; title: string }[]
+) {
+  const sent = await sendInteractiveButtons({
+    phoneNumberId,
+    accessToken,
+    to,
+    bodyText: text,
+    buttons,
   });
   await logBotMessage(conversationId, text, sent.messageId);
   return sent;
@@ -125,18 +145,45 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   }
 
   // Load message templates with fallback to default Hindi values
-  const welcomeMsg = config.welcome_msg || `नमस्ते 😊\n\nक्या आपके पास खाली जमीन / प्लॉट है?\n\n4G/5G टावर इंस्टॉलेशन के लिए आवेदन आमंत्रित हैं।\n\nकृपया जवाब दें:\n✅ YES – अगर आपके पास जमीन है\n❌ NO – अगर नहीं है`;
+  const welcomeMsg = config.welcome_msg || `मोबाइल टावर स्थापना संबंधी अपडेट
+
+प्रिय महोदय/महोदया,
+
+मोबाइल टावर स्थापना के अवसर में आपकी रुचि के लिए धन्यवाद।
+
+जैसा कि चर्चा हुई थी, हमने आपके विवरण को ऑनलाइन स्थान सर्वेक्षण के लिए हमारी सर्वेक्षण टीम को भेज दिया है। इसके आधार पर, हम पुष्टि करेंगे कि आपके क्षेत्र में टावर स्थापना की आवश्यकता है या नहीं।
+
+📍 यदि आपका स्थान स्वीकृत हो जाता है, तो आपको निम्नलिखित लाभ प्राप्त होंगे:
+
+✅ अग्रिम भुगतान: ₹70,00,000/- (स्थापना से पहले)
+
+✅ मासिक किराया: ₹60,000/-*
+   (₹30,000/- सीधे आपके खाते में जमा + ₹30,000/- EMI के रूप में समायोजित)
+
+✅ रोजगार का अवसर: 20,000/- 
+   टावर रखरखाव अनुबंध के तहत परिवार के एक सदस्य को निश्चित मासिक वेतन पर नौकरी दी जाएगी।
+
+📝 आपके स्थान की स्वीकृति मिलने के बाद, आपको कल सुबह तक WhatsApp पर PDF स्वीकृति रिपोर्ट प्राप्त हो जाएगी SURVEY के बाद।
+
+📌 महत्वपूर्ण नोट:
+स्वीकृति मिलने पर, आपको ₹2,550 का एकमुश्त पंजीकरण शुल्क देना होगा, जिससे आपकी भागीदारी और बुकिंग की पुष्टि हो जाएगी
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👉 अगर आप इन शर्तों से सहमत हैं और आगे बात करना चाहते हैं, तो कृपया "YES" लिखकर भेजें (सहमत होने के लिए)।
+
+👉 अगर नहीं, तो "NO" लिखकर जवाब दें।
+
+सादर,
+Ms. Meena Kumari
+ग्राहक संबंध कार्यकारी
+📞 8796156214
+मोबाइल टावर स्थापना सेवाएं`;
   const askNameMsg = config.ask_name_msg || `नमस्ते 😊\n\n4G / 5G डिजिटल टावर इंस्टॉलेशन आवेदन के लिए कृपया नीचे दी गई जानकारी एक-एक करके बताएं:\n\n1️⃣ आपका पूरा नाम (Full Name) क्या है?`;
-  const askLocationMsg = config.ask_location_msg || `धन्यवाद।\n\n2️⃣ आपकी जमीन किस स्थान (शहर / गांव / जिला) पर है? कृपया स्थान का नाम लिखकर भेजें:`;
-  const askStateMsg = config.ask_state_msg || `3️⃣ आपकी जमीन किस राज्य (State) में है?`;
-  const askPinMsg = config.ask_pincode_msg || `4️⃣ आपके क्षेत्र का पिन कोड (PIN Code) क्या है?`;
-  const askMobileMsg = config.ask_mobile_msg || `5️⃣ आपका संपर्क मोबाइल नंबर क्या है? \n\n(यदि आप इसी व्हाट्सएप नंबर का उपयोग करना चाहते हैं, तो "YES" लिखकर भेजें)`;
-  const askSizeMsg = config.ask_size_msg || `6️⃣ आपकी जमीन का साइज (Land Size) क्या है? (जैसे: 1500 sq ft, 20x50, 1 बीघा, या 2 कट्ठा):`;
-  const askOwnershipMsg = config.ask_ownership_msg || `7️⃣ क्या जमीन आपकी स्वयं की (खुद की) है? (हाँ / नहीं):`;
+  const askStateMsg = config.ask_state_msg || `2️⃣ आपकी जमीन किस राज्य (State) में है?`;
+  const askPinMsg = config.ask_pincode_msg || `3️⃣ आपके क्षेत्र का पिन कोड (PIN Code) क्या है?`;
   const endNoLandMsg = config.end_no_land_msg || `ठीक है 🙏\n\nकोई बात नहीं। अगर भविष्य में जमीन हो या किसी और को जरूरत हो, तो हमसे जरूर संपर्क करें।\n\nमोबाइल टावर स्थापना – आपकी सेवा में सदैव तत्पर।`;
-  const endNoTermsMsg = config.end_no_terms_msg || `ठीक है 🙏\n\nआपके जवाब के लिए धन्यवाद。\n\nअगर भविष्य में आप इस अवसर का लाभ उठाना चाहें, तो हमसे जरूर संपर्क करें。\n\nमोबाइल टावर स्थापना – आपकी सेवा में हमेशा तत्पर. 😊`;
-  const surveyMsg = config.survey_msg || `मोबाइल टावर स्थापना संबंधी अपडेट\n\nप्रिय महोदय/महोदया,\n\nमोबाइल टावर स्थापना के अवसर में आपकी रुचि के लिए धन्यवाद।\n\nजैसा कि चर्चा हुई थी, हमने आपके विवरण को ऑनलाइन स्थान सर्वेक्षण के लिए हमारी सर्वेक्षण टीम को भेज दिया है। इसके आधार पर, हम पुष्टि करेंगे कि आपके क्षेत्र में टावर स्थापना की आवश्यकता है या नहीं。\n\n📍 यदि आपका स्थान स्वीकृत हो जाता है, तो आपको निम्नलिखित लाभ प्राप्त होंगे:\n\n✅ अग्रिम भुगतान: ₹70,00,000/- (स्थापना से पहले)\n\n✅ मासिक किराया: ₹60,000/-*\n   (₹30,000/- सीधे आपके खाते में जमा + ₹30,000/- EMI के रूप में समायोजित)\n\n✅ रोजगार का अवसर:\n   टावर रखरखाव अनुबंध के तहत परिवार के एक सदस्य को निश्चित मासिक वेतन पर नौकरी दी जाएगी。\n\n📝 आपके स्थान की स्वीकृति मिलने के बाद, आपको कल सुबह तक WhatsApp पर PDF स्वीकृति रिपोर्ट प्राप्त हो जाएगी SURVEY के बाद।\n\n📌 महत्वपूर्ण नोट:\nस्वीकृति मिलने पर, आपको ₹2,550 का एकमुश्त पंजीकरण शुल्क देना होगा, जिससे आपकी भागीदारी और बुकिंग की पुष्टि हो जाएगी\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👉 अगर आप इन शर्तों से सहमत हैं और आगे बात करना चाहते हैं, तो कृपया "YES" लिखकर भेजें (सहमत होने के लिए)।\n\n👉 अगर नहीं, तो "NO" लिखकर जवाब दें।\n\nसादर,\nMs. Meena Kumari\nग्राहक संबंध कार्यकारी\n📞 9217662196\nमोबाइल टावर स्थापना सेवाएं`;
-  const paymentMsg = config.payment_msg || `बहुत अच्छा! 🎉\n\nआपका स्थान हमारी सर्वेक्षण टीम द्वारा जांचा जाएगा。\n\n📋 पंजीकरण की प्रक्रिया:\n\n✅ पंजीकरण शुल्क: ₹2,550/-\n\nयह शुल्क आपकी बुकिंग और भागीदारी की पुष्टि के लिए आवश्यक है。\n\nपंजीकरण शुल्क जमा करने के बाद ही आगे की प्रक्रिया (जैसे NOC और एग्रीमेंट) शुरू होगी। QR कोड / Payment Details आपको जल्द ही भेजी जाएंगी।\n\nकृपया थोड़ा इंतजार करें। 🙏`;
+  const paymentMsg = config.payment_msg || `बहुत अच्छा! 🎉\n\nआपका स्थान हमारी सर्वेक्षण टीम द्वारा जांचा जाएगा।\n\n📋 पंजीकरण की प्रक्रिया:\n\n✅ पंजीकरण शुल्क: ₹2,550/-\n\nयह शुल्क आपकी बुकिंग और भागीदारी की पुष्टि के लिए आवश्यक है\n\nपंजीकरण शुल्क जमा करने के बाद ही आगे की प्रक्रिया (जैसे NOC और एग्रीमेंट) शुरू होगी। QR कोड / Payment Details आपको जल्द ही भेजी जाएंगी।\n\nकृपया थोड़ा इंतजार करें। 🙏`;
 
   // 1. Fetch active chatbot run for this contact
   const { data: run } = await db
@@ -162,8 +209,11 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         collected_data: {}
       });
 
-      // Send greeting
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg);
+      // Send greeting with buttons
+      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
+        { id: 'yes_welcome', title: 'YES' },
+        { id: 'no_welcome', title: 'NO' }
+      ]);
       return true; // consumed
     }
 
@@ -174,10 +224,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   const currentState = run.state;
   const collectedData = run.collected_data || {};
 
+  const validStates = ['AWAITING_LAND_CONFIRMATION', 'AWAITING_NAME', 'AWAITING_STATE', 'AWAITING_PINCODE'];
+  if (!validStates.includes(currentState)) {
+    console.log(`[chatbot] Obsolete state "${currentState}" detected. Deleting chatbot run for contact: ${contactId}`);
+    await db.from('chatbot_runs').delete().eq('id', run.id);
+    return false;
+  }
+
   switch (currentState) {
     case 'AWAITING_LAND_CONFIRMATION': {
-      const isYes = ['yes', 'yes.', 'yes,', 'interested', 'हाँ', 'हाँ।', 'है', 'ha', 'haa', 'han', 'y'].some(k => textLower.includes(k));
-      const isNo = ['no', 'no.', 'no,', 'नहीं', 'नही', 'nah', 'n'].some(k => textLower.includes(k));
+      const isYes = ['yes', 'yes.', 'yes,', 'interested', 'हाँ', 'हाँ।', 'है', 'ha', 'haa', 'han', 'y', 'yes_welcome'].some(k => textLower.includes(k));
+      const isNo = ['no', 'no.', 'no,', 'नहीं', 'नही', 'nah', 'n', 'no_welcome'].some(k => textLower.includes(k));
 
       if (isYes) {
         await db.from('chatbot_runs').update({
@@ -191,8 +248,11 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
 
         await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, endNoLandMsg);
       } else {
-        const repromptMsg = `कृपया YES या NO में जवाब दें:\n\n✅ YES – अगर आपके पास जमीन है\n❌ NO – अगर नहीं है`;
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, repromptMsg);
+        const repromptMsg = `कृपया YES या NO में जवाब दें।`;
+        await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, repromptMsg, [
+          { id: 'yes_welcome', title: 'YES' },
+          { id: 'no_welcome', title: 'NO' }
+        ]);
       }
       return true;
     }
@@ -200,15 +260,14 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     case 'AWAITING_NAME': {
       collectedData.name = textClean;
       await db.from('tower_leads').update({ name: textClean }).eq('contact_id', contactId);
-      // using scope askLocationMsg
 
       await db.from('chatbot_runs').update({
-        state: 'AWAITING_LOCATION',
+        state: 'AWAITING_STATE',
         collected_data: collectedData,
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
 
-      await postToGoogleSheets({
+      postToGoogleSheets({
         name: collectedData.name || 'Unknown',
         mobile_no: senderPhone,
         location: '',
@@ -217,33 +276,7 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         land_size: '',
         ownership: '',
         status: 'Pending - Name Collected'
-      });
-
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askLocationMsg);
-      return true;
-    }
-
-    case 'AWAITING_LOCATION': {
-      collectedData.location = textClean;
-      await db.from('tower_leads').update({ location: textClean }).eq('contact_id', contactId);
-      // using scope askStateMsg
-
-      await db.from('chatbot_runs').update({
-        state: 'AWAITING_STATE',
-        collected_data: collectedData,
-        updated_at: new Date().toISOString()
-      }).eq('id', run.id);
-
-      await postToGoogleSheets({
-        name: collectedData.name || 'Unknown',
-        mobile_no: senderPhone,
-        location: collectedData.location,
-        state: '',
-        pin_code: '',
-        land_size: '',
-        ownership: '',
-        status: 'Pending - Location Collected'
-      });
+      }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
 
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askStateMsg);
       return true;
@@ -252,7 +285,6 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     case 'AWAITING_STATE': {
       collectedData.state = textClean;
       await db.from('tower_leads').update({ state: textClean }).eq('contact_id', contactId);
-      // using scope askPinMsg
 
       await db.from('chatbot_runs').update({
         state: 'AWAITING_PINCODE',
@@ -260,16 +292,16 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
 
-      await postToGoogleSheets({
+      postToGoogleSheets({
         name: collectedData.name || 'Unknown',
         mobile_no: senderPhone,
-        location: collectedData.location || '',
+        location: '',
         state: collectedData.state,
         pin_code: '',
         land_size: '',
         ownership: '',
         status: 'Pending - State Collected'
-      });
+      }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
 
       await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askPinMsg);
       return true;
@@ -277,253 +309,38 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
 
     case 'AWAITING_PINCODE': {
       collectedData.pin_code = textClean;
-      await db.from('tower_leads').update({ pin_code: textClean }).eq('contact_id', contactId);
-      // using scope askMobileMsg
-
-      await db.from('chatbot_runs').update({
-        state: 'AWAITING_MOBILE',
-        collected_data: collectedData,
+      const finalLocation = collectedData.state || 'Unknown';
+      await db.from('tower_leads').update({
+        pin_code: textClean,
+        location: finalLocation,
+        status: 'Interested – Payment Pending',
         updated_at: new Date().toISOString()
-      }).eq('id', run.id);
+      }).eq('contact_id', contactId);
 
-      await postToGoogleSheets({
+      postToGoogleSheets({
         name: collectedData.name || 'Unknown',
         mobile_no: senderPhone,
-        location: collectedData.location || '',
+        location: finalLocation,
         state: collectedData.state || '',
-        pin_code: collectedData.pin_code,
+        pin_code: textClean,
         land_size: '',
         ownership: '',
-        status: 'Pending - Pincode Collected'
-      });
+        status: 'Interested – Payment Pending'
+      }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
 
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askMobileMsg);
-      return true;
-    }
+      await db.from('chatbot_runs').delete().eq('id', run.id);
 
-    case 'AWAITING_MOBILE': {
-      const isYes = ['yes', 'yes.', 'हाँ', 'हाँ।', 'ha', 'haa', 'han', 'y'].some(k => textLower === k);
-      collectedData.mobile_no = isYes ? senderPhone : textClean;
-      await db.from('tower_leads').update({ mobile_no: collectedData.mobile_no }).eq('contact_id', contactId);
-      // using scope askSizeMsg
+      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, paymentMsg);
 
-      await db.from('chatbot_runs').update({
-        state: 'AWAITING_LAND_SIZE',
-        collected_data: collectedData,
-        updated_at: new Date().toISOString()
-      }).eq('id', run.id);
+      runAutomationsForTrigger({
+        userId,
+        triggerType: 'tower_chatbot_completed',
+        contactId,
+        context: { conversation_id: conversationId }
+      }).catch(err => console.error('Failed to trigger automation:', err));
 
-      await postToGoogleSheets({
-        name: collectedData.name || 'Unknown',
-        mobile_no: collectedData.mobile_no,
-        location: collectedData.location || '',
-        state: collectedData.state || '',
-        pin_code: collectedData.pin_code || '',
-        land_size: '',
-        ownership: '',
-        status: 'Pending - Mobile Collected'
-      });
-
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askSizeMsg);
-      return true;
-    }
-
-    case 'AWAITING_LAND_SIZE': {
-      collectedData.land_size = textClean;
-      await db.from('tower_leads').update({ land_size: textClean }).eq('contact_id', contactId);
-      // using scope askOwnershipMsg
-
-      await db.from('chatbot_runs').update({
-        state: 'AWAITING_OWNERSHIP',
-        collected_data: collectedData,
-        updated_at: new Date().toISOString()
-      }).eq('id', run.id);
-
-      await postToGoogleSheets({
-        name: collectedData.name || 'Unknown',
-        mobile_no: collectedData.mobile_no || senderPhone,
-        location: collectedData.location || '',
-        state: collectedData.state || '',
-        pin_code: collectedData.pin_code || '',
-        land_size: collectedData.land_size,
-        ownership: '',
-        status: 'Pending - Size Collected'
-      });
-
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askOwnershipMsg);
-      return true;
-    }
-
-    case 'AWAITING_OWNERSHIP': {
-      collectedData.is_owned = textClean;
-
-      // Update lead ownership in tower_leads
-      await db.from('tower_leads').update({ ownership: textClean }).eq('contact_id', contactId);
-
-      // Get lead ID
-      const { data: lead } = await db.from('tower_leads').select('id').eq('contact_id', contactId).maybeSingle();
-      collectedData.lead_id = lead?.id;
-
-      // Save to Google Sheets
-      await postToGoogleSheets({
-        name: collectedData.name || 'Unknown',
-        mobile_no: collectedData.mobile_no || senderPhone,
-        location: collectedData.location || 'Not provided',
-        state: collectedData.state || '',
-        pin_code: collectedData.pin_code || '',
-        land_size: collectedData.land_size || '',
-        ownership: textClean,
-        status: 'Pending'
-      });
-
-      // using scope surveyMsg
-
-      await db.from('chatbot_runs').update({
-        state: 'AWAITING_TERMS_AGREEMENT',
-        collected_data: collectedData,
-        updated_at: new Date().toISOString()
-      }).eq('id', run.id);
-
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, surveyMsg);
-      return true;
-    }
-
-    case 'AWAITING_TERMS_AGREEMENT': {
-      const isYes = ['yes', 'yes.', 'yes,', 'हाँ', 'हाँ।', 'ha', 'haa', 'han', 'agree', 'y'].some(k => textLower.includes(k));
-      const isNo = ['no', 'no.', 'no,', 'नहीं', 'नही', 'not interested', 'n'].some(k => textLower.includes(k));
-
-      const leadId = collectedData.lead_id;
-
-      if (isYes) {
-        // using scope paymentMsg
-
-        // Update lead in local DB
-        if (leadId) {
-          await db.from('tower_leads')
-            .update({ status: 'Interested – Payment Pending', updated_at: new Date().toISOString() })
-            .eq('id', leadId);
-        }
-
-        // Post update to Google Sheets
-        await postToGoogleSheets({
-          name: collectedData.name || 'Unknown',
-          mobile_no: collectedData.mobile_no || senderPhone,
-          location: collectedData.location || 'Not provided',
-          state: collectedData.state || '',
-          pin_code: collectedData.pin_code || '',
-          land_size: collectedData.land_size || '',
-          ownership: collectedData.is_owned || '',
-          status: 'Interested – Payment Pending'
-        });
-
-        // Clear chatbot run
-        await db.from('chatbot_runs').delete().eq('id', run.id);
-
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, paymentMsg);
-
-        // SEND APPROVAL PDF AUTOMATICALLY
-        try {
-          console.log('[chatbot] Generating and sending Approval PDF automatically...');
-          const finalName = collectedData.name || 'Unknown';
-          const finalLocation = collectedData.location || 'Unknown Location';
-          collectedData.date = new Date().toISOString();
-          const pdfBuffer = await generateCongratulationsDoc(collectedData);
-          const fileName = `approval_${leadId || contactId}_${Date.now()}.pdf`;
-          
-          const { error: uploadError } = await db.storage.from('documents').upload(fileName, pdfBuffer, {
-            contentType: 'application/pdf',
-            upsert: true
-          });
-          
-          if (!uploadError) {
-            const { data: { publicUrl } } = db.storage.from('documents').getPublicUrl(fileName);
-            const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`;
-            
-            const sentPdf = await sendDocumentMessage({
-              phoneNumberId,
-              accessToken,
-              to: senderPhone,
-              documentUrl: publicUrl,
-              filename: fileName,
-              caption: captionText
-            });
-            await db.from('messages').insert({
-              conversation_id: conversationId,
-              sender_type: 'agent',
-              content_type: 'document',
-              content_text: captionText,
-              media_url: publicUrl,
-              message_id: sentPdf.messageId,
-              status: 'sent',
-            });
-            
-            await db.from('conversations').update({
-              last_message_text: "Sent Approval PDF",
-              last_message_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }).eq('id', conversationId);
-            
-            // Mark as Approval Sent
-            if (leadId) {
-              await db.from('tower_leads').update({ status: 'Approval Sent' }).eq('id', leadId);
-              // Also update sheet to reflect the approval was sent!
-              await postToGoogleSheets({
-                name: collectedData.name || 'Unknown',
-                mobile_no: collectedData.mobile_no || senderPhone,
-                location: collectedData.location || 'Not provided',
-                state: collectedData.state || '',
-                pin_code: collectedData.pin_code || '',
-                land_size: collectedData.land_size || '',
-                ownership: collectedData.is_owned || '',
-                status: 'Approval Sent'
-              });
-            }
-          } else {
-            console.error('[chatbot] Failed to upload generated PDF:', uploadError);
-          }
-        } catch (pdfErr) {
-          console.error('[chatbot] Failed to auto-send Approval PDF:', pdfErr);
-        }
-
-        // Trigger visual automations waiting for tower completion
-        runAutomationsForTrigger({
-          userId,
-          triggerType: 'tower_chatbot_completed' as any,
-          contactId,
-          context: { conversation_id: conversationId }
-        }).catch(err => console.error('Failed to trigger automation:', err));
-
-      } else if (isNo) {
-        // Update lead in local DB
-        if (leadId) {
-          await db.from('tower_leads')
-            .update({ status: 'Not Interested', updated_at: new Date().toISOString() })
-            .eq('id', leadId);
-        }
-
-        // Post update to Google Sheets
-        await postToGoogleSheets({
-          name: collectedData.name || 'Unknown',
-          mobile_no: collectedData.mobile_no || senderPhone,
-          location: collectedData.location || 'Not provided',
-          state: collectedData.state || '',
-          pin_code: collectedData.pin_code || '',
-          land_size: collectedData.land_size || '',
-          ownership: collectedData.is_owned || '',
-          status: 'Not Interested'
-        });
-
-        // Clear chatbot run
-        await db.from('chatbot_runs').delete().eq('id', run.id);
-
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, endNoTermsMsg);
-      } else {
-        const repromptMsg = `👉 अगर आप इन शर्तों से सहमत हैं और आगे बात करना चाहते हैं, तो कृपया "YES" लिखकर भेजें (सहमत होने के लिए)।\n\n👉 अगर नहीं, तो "NO" लिखकर जवाब दें।`;
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, repromptMsg);
-      }
       return true;
     }
   }
-
   return false;
 }

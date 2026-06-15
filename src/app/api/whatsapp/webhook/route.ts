@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia, sendTextMessage } from '@/lib/whatsapp/meta-api'
@@ -165,7 +165,7 @@ export async function GET(request: Request) {
 }
 
 // POST - Receive messages
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   // Read raw body first so we can HMAC-verify the exact bytes Meta
   // signed. request.json() would re-encode and break the signature.
   const rawBody = await request.text()
@@ -186,11 +186,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  // Process webhook and wait for it to complete in serverless environment
-  try {
-    await processWebhook(body)
-  } catch (error) {
-    console.error('Error processing webhook:', error)
+  // Process webhook in the background without blocking response
+  if (typeof request.waitUntil === 'function') {
+    request.waitUntil(
+      processWebhook(body).catch((error) => {
+        console.error('Error in background processWebhook:', error)
+      })
+    )
+  } else {
+    // Fallback if waitUntil is not present (e.g. some local environments)
+    processWebhook(body).catch((error) => {
+      console.error('Error in unawaited processWebhook:', error)
+    })
   }
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
