@@ -187,8 +187,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Process webhook in the background without blocking response
-  if (typeof request.waitUntil === 'function') {
-    request.waitUntil(
+  const reqWithWait = request as any
+  if (typeof reqWithWait.waitUntil === 'function') {
+    reqWithWait.waitUntil(
       processWebhook(body).catch((error) => {
         console.error('Error in background processWebhook:', error)
       })
