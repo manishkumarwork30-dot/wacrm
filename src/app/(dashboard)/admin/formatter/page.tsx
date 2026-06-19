@@ -116,11 +116,10 @@ export default function FormatterPage() {
         firstLineParts.push(`TEHSIL - ${tehsil.toUpperCase()}`);
       }
       if (district) {
-  const stateSuffix = stateCode ? ` (${stateCode})` : '';
-  const pinSuffix = pincode ? ` - ${pincode}` : '';
-  // Use hyphen directly after label without extra space
-  firstLineParts.push(`DISTT-${district.toUpperCase()}${stateSuffix}${pinSuffix}`);
-}
+        const stateSuffix = stateCode ? ` (${stateCode})` : '';
+        const pinSuffix = pincode ? ` - ${pincode}` : '';
+        firstLineParts.push(`DISTT - ${district.toUpperCase()}${stateSuffix}${pinSuffix}`);
+      }
 
       const firstLine = firstLineParts.join(', ');
       const secondLine = `MOBILE NO - ${mobile}`;

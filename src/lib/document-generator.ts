@@ -288,7 +288,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
       doc.moveDown(0.8);
       doc.font(B).fontSize(11).text(`Mr. ${finalName}`, 40, doc.y);
-      doc.font(B).fontSize(11).text(`District - ${finalLocation}`, 40, doc.y);
+      doc.font(B).fontSize(11).text(`District-${finalLocation}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map

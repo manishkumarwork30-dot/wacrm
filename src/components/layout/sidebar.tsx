@@ -1,7 +1,7 @@
 // Vercel update trigger
 
 
-import Link from "next/link";
+import Link from "next/link"; // Vercel redeploy trigger
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -76,7 +76,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const totalUnread = useTotalUnread();
 
   const displayNavItems = [...navItems];
-  if (profile?.role === "super_admin") {
+  if (profile?.role === "super_admin" || profile?.role === "superadmin") {
     displayNavItems.push({
       href: "/admin/users",
       label: "Admin Panel",
