@@ -15,11 +15,28 @@ export async function GET(req: Request) {
   );
 
   try {
-    // We want leads that qualified 10 hours ago.
-    // 'updated_at' <= now - 10 hours
-    const tenHoursAgo = new Date();
-    tenHoursAgo.setHours(tenHoursAgo.getHours() - 10);
-    const timeThreshold = tenHoursAgo.toISOString();
+    // Check IST business hours (10 AM to 6 PM)
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const utcMinutes = now.getUTCMinutes();
+    let istHours = utcHours + 5;
+    let istMinutes = utcMinutes + 30;
+    if (istMinutes >= 60) {
+      istHours += 1;
+      istMinutes -= 60;
+    }
+    istHours = istHours % 24;
+
+    if (istHours < 10 || istHours >= 18) {
+      console.log('Outside business hours (10 AM - 6 PM IST). Skipping approval PDF sending.');
+      return NextResponse.json({ message: 'Outside business hours' }, { status: 200 });
+    }
+
+    // We want leads that qualified 2 hours ago.
+    // 'updated_at' <= now - 2 hours
+    const waitTimeThreshold = new Date();
+    waitTimeThreshold.setHours(waitTimeThreshold.getHours() - 2);
+    const timeThreshold = waitTimeThreshold.toISOString();
 
     const { data: leads, error } = await db
       .from('tower_leads')
@@ -55,12 +72,12 @@ export async function GET(req: Request) {
         const pdfBytes = await generateCongratulationsDoc({
           name: lead.name || 'User',
           location: lead.location || 'Your Location',
-          mobile_no: lead.phone,
+          mobile_no: lead.mobile_no || lead.phone || '',
           state: lead.state,
           pin_code: lead.pin_code,
           land_size: lead.land_size,
           ownership: lead.ownership,
-          date: lead.updated_at || new Date().toISOString()
+          date: lead.approval_date || lead.updated_at || new Date().toISOString()
         });
         const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
 
@@ -97,7 +114,11 @@ export async function GET(req: Request) {
 
         // 4. Mark lead as processed
         await db.from('tower_leads')
-          .update({ welcome_doc_sent: true })
+          .update({ 
+            welcome_doc_sent: true,
+            status: 'Approval Sent',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', lead.id);
 
         processedCount++;

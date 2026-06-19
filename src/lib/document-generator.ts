@@ -2,25 +2,25 @@ import PDFDocument from 'pdfkit';
 
 // ── Module-level caches (reused across warm serverless containers) ────────────
 
-let _fontCache: {
+let _fontPromise: Promise<{
   regular: Buffer | null;
   bold: Buffer | null;
   italic: Buffer | null;
-} | null = null;
+}> | null = null;
 
-let _assetCache: {
+let _assetPromise: Promise<{
   logo: Buffer | null;
   qr: Buffer | null;
   signature: Buffer | null;
   stamp: Buffer | null;
-  watermark: Buffer | null;   // Survey-Of-India.png  – shown on every page
-  hdrP2P3: Buffer | null;     // Picture3.png         – page 2 & 3 header
-  hdrP4: Buffer | null;       // page 4 header image
-  p3img1: Buffer | null;      // Picture7.png         – page 3 content
-  p3img2: Buffer | null;      // Picture8.png         – page 3 content
-  p4img1: Buffer | null;      // Picture9.png         – page 4 content
-  p4img2: Buffer | null;      // Picture10.png        – page 4 content
-} | null = null;
+  watermark: Buffer | null;
+  hdrP2P3: Buffer | null;
+  hdrP4: Buffer | null;
+  p3img1: Buffer | null;
+  p3img2: Buffer | null;
+  p4img1: Buffer | null;
+  p4img2: Buffer | null;
+}> | null = null;
 
 const fetchBuffer = async (url: string): Promise<Buffer | null> => {
   try {
@@ -32,40 +32,46 @@ const fetchBuffer = async (url: string): Promise<Buffer | null> => {
   return null;
 };
 
-const getFonts = async () => {
-  if (_fontCache) return _fontCache;
-  const base =
-    'https://raw.githubusercontent.com/google/fonts/main/apache/roboto/static/';
-  const [regular, bold, italic] = await Promise.all([
-    fetchBuffer(base + 'Roboto-Regular.ttf'),
-    fetchBuffer(base + 'Roboto-Bold.ttf'),
-    fetchBuffer(base + 'Roboto-Italic.ttf'),
-  ]);
-  _fontCache = { regular, bold, italic };
-  return _fontCache;
+export const getFonts = () => {
+  if (!_fontPromise) {
+    _fontPromise = (async () => {
+      const base =
+        'https://raw.githubusercontent.com/google/fonts/main/apache/roboto/static/';
+      const [regular, bold, italic] = await Promise.all([
+        fetchBuffer(base + 'Roboto-Regular.ttf'),
+        fetchBuffer(base + 'Roboto-Bold.ttf'),
+        fetchBuffer(base + 'Roboto-Italic.ttf'),
+      ]);
+      return { regular, bold, italic };
+    })();
+  }
+  return _fontPromise;
 };
 
-const getAssets = async () => {
-  if (_assetCache) return _assetCache;
-  const [
-    logo, qr, signature, stamp,
-    watermark, hdrP2P3, hdrP4,
-    p3img1, p3img2, p4img1, p4img2,
-  ] = await Promise.all([
-    fetchBuffer('https://htlnetwork.com/assets/images/logo.png'),
-    fetchBuffer('https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png'),
-    fetchBuffer('https://i.ibb.co/Fqj8CGm3/signature.png'),
-    fetchBuffer('https://i.ibb.co/v6cQ2rDC/approval-image.png'),
-    fetchBuffer('https://i.ibb.co/PZKK8CZ4/Survey-Of-India.png'),  // watermark – every page
-    fetchBuffer('https://i.ibb.co/hJpwPfZd/Picture3.png'),          // page 2 & 3 header
-    fetchBuffer('https://i.ibb.co/hJpwPfZd/Picture3.png'),          // page 4 header (reuse verified image)
-    fetchBuffer('https://i.ibb.co/b0wmpr0/Picture7.png'),
-    fetchBuffer('https://i.ibb.co/CpYqYxP0/Picture8.png'),
-    fetchBuffer('https://i.ibb.co/Xrfg6kYb/Picture9.png'),
-    fetchBuffer('https://i.ibb.co/YBkM6RZq/Picture10.png'),
-  ]);
-  _assetCache = { logo, qr, signature, stamp, watermark, hdrP2P3, hdrP4, p3img1, p3img2, p4img1, p4img2 };
-  return _assetCache;
+export const getAssets = () => {
+  if (!_assetPromise) {
+    _assetPromise = (async () => {
+      const [
+        logo, qr, signature, stamp,
+        watermark, hdrP2P3, hdrP4,
+        p3img1, p3img2, p4img1, p4img2,
+      ] = await Promise.all([
+        fetchBuffer('https://htlnetwork.com/assets/images/logo.png'),
+        fetchBuffer('https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png'),
+        fetchBuffer('https://i.ibb.co/Fqj8CGm3/signature.png'),
+        fetchBuffer('https://i.ibb.co/v6cQ2rDC/approval-image.png'),
+        fetchBuffer('https://i.ibb.co/PZKK8CZ4/Survey-Of-India.png'),  // watermark – every page
+        fetchBuffer('https://i.ibb.co/hJpwPfZd/Picture3.png'),          // page 2 & 3 header
+        fetchBuffer('https://i.ibb.co/hJpwPfZd/Picture3.png'),          // page 4 header (reuse verified image)
+        fetchBuffer('https://i.ibb.co/b0wmpr0/Picture7.png'),
+        fetchBuffer('https://i.ibb.co/CpYqYxP0/Picture8.png'),
+        fetchBuffer('https://i.ibb.co/Xrfg6kYb/Picture9.png'),
+        fetchBuffer('https://i.ibb.co/YBkM6RZq/Picture10.png'),
+      ]);
+      return { logo, qr, signature, stamp, watermark, hdrP2P3, hdrP4, p3img1, p3img2, p4img1, p4img2 };
+    })();
+  }
+  return _assetPromise;
 };
 
 /** Draw the Survey-of-India watermark centred on the current page (every page). */
@@ -152,7 +158,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // Top-left Logo
       if (assets.logo) {
-        try { doc.image(assets.logo, 40, 20, { width: 150, height: 100 }); }
+        try { doc.image(assets.logo, 60, 20, { width: 150, height: 100 }); }
         catch { _drawFallbackTower(doc, 40, 20); }
       } else {
         _drawFallbackTower(doc, 40, 20);

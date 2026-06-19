@@ -103,7 +103,8 @@ export async function POST(request: Request) {
         pin_code: null,
         land_size: null,
         ownership: null,
-        status: 'Pending'
+        status: 'Pending',
+        welcome_doc_sent: false
       }).eq('contact_id', contact_id);
     }
 

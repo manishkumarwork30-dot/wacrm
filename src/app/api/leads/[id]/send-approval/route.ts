@@ -57,7 +57,7 @@ export async function POST(
       return NextResponse.json({ error: 'Lead ID required' }, { status: 400 })
     }
 
-    const { name, location } = await request.json()
+    const { name, location, date } = await request.json()
 
     // 1. Fetch lead and get contact details
     const { data: lead, error: leadError } = await supabaseAdmin()
@@ -78,6 +78,7 @@ export async function POST(
     // 2. Determine final name and location
     const finalName = name || lead.name
     const finalLocation = location || lead.location
+    const finalDate = date || lead.approval_date || new Date().toISOString()
 
     if (!finalName || !finalLocation) {
       return NextResponse.json({ error: 'Name and Location are required to generate PDF' }, { status: 400 })
@@ -98,10 +99,10 @@ export async function POST(
     // ──────────────────────────────────────────────────────────────────────
 
     // 3. Update the lead if the details were missing/changed
-    if (finalName !== lead.name || finalLocation !== lead.location) {
+    if (finalName !== lead.name || finalLocation !== lead.location || date !== lead.approval_date) {
       await supabaseAdmin()
         .from('tower_leads')
-        .update({ name: finalName, location: finalLocation })
+        .update({ name: finalName, location: finalLocation, approval_date: finalDate })
         .eq('id', leadId)
     }
 
@@ -114,7 +115,7 @@ export async function POST(
       pin_code: lead.pin_code,
       land_size: lead.land_size,
       ownership: lead.ownership,
-      date: new Date().toISOString()
+      date: finalDate
     });
 
     // 5. Upload to Supabase Storage
