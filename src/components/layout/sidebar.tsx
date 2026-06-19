@@ -1,4 +1,5 @@
-"use client";
+// Vercel update trigger
+
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";

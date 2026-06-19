@@ -59,7 +59,11 @@ export default function FormatterPage() {
           cityVillage = line.replace(/^(city|village|vill)[-:\s]+/i, '').trim();
         } else if (lowerLine.includes('tehsil-') || lowerLine.includes('tehsil:')) {
           tehsil = line.split(/tehsil[-:\s]+/i)[1]?.trim() || '';
-        } else if (lowerLine.includes('district-') || lowerLine.includes('district:') || lowerLine.includes('distt-') || lowerLine.includes('distt:')) {
+        } else if (lowerLine.includes('district-') || lowerLine.includes('district:') || lowerLine.includes('distt-') || lowerLine.includes('distt:') || lowerLine.startsWith('district ')) {
+            // Extract after 'district' keyword allowing space, hyphen or colon
+            const match = line.match(/^district[\s-:]+(.+)/i);
+            district = match ? match[1].trim() : '';
+          }
           district = line.replace(/^.*dist(rict|t)[-:\s]+/i, '').trim();
         } else if (lowerLine.startsWith('pincode-') || lowerLine.includes('pincode:')) {
           pincode = line.replace(/^pincode[-:\s]+/i, '').trim();
