@@ -40,8 +40,10 @@ export default function FormatterPage() {
       }
 
       for (let line of lines) {
+        const upperLine = line.toUpperCase();
+        
         // Check for S/O line
-        if (line.toUpperCase().includes(' S/O ') || line.toUpperCase().includes(' S/O')) {
+        if (upperLine.includes(' S/O ') || upperLine.includes(' S/O')) {
           const parts = line.split(/\s+s\/o\s*/i);
           if (parts.length >= 2) {
             applicantName = parts[0].trim();
@@ -55,12 +57,19 @@ export default function FormatterPage() {
         const lowerLine = line.toLowerCase();
 
         // Check for fields
-        if (lowerLine.startsWith('city-') || lowerLine.includes('city:') || lowerLine.startsWith('village-') || lowerLine.startsWith('vill-')) {
-          cityVillage = line.replace(/^(city|village|vill)[-:\s]+/i, '').trim();
+        if (lowerLine.startsWith('city-') || lowerLine.includes('city:') || lowerLine.startsWith('village-') || lowerLine.startsWith('vill-') || lowerLine.includes('bajrang mohalla')) {
+          // If bajrang mohalla line and contains city info
+          let cleanVal = line;
+          if (lowerLine.startsWith('city-')) {
+            cleanVal = line.replace(/^city-[-:\s]*/i, '');
+          }
+          cityVillage = cleanVal.trim();
         } else if (lowerLine.includes('tehsil-') || lowerLine.includes('tehsil:')) {
-          tehsil = line.split(/tehsil[-:\s]+/i)[1]?.trim() || '';
-        } else if (lowerLine.includes('district-') || lowerLine.includes('district:') || lowerLine.includes('distt-') || lowerLine.includes('distt:') || lowerLine.startsWith('district ')) {
-          district = line.replace(/^.*dist(rict|t)[-:\s]+/i, '').trim();
+          // Could be "Post Office -Tehsil- Narsingh Garh"
+          const parts = line.split(/tehsil[-:\s]*/i);
+          tehsil = parts[1]?.trim() || '';
+        } else if (lowerLine.includes('district-') || lowerLine.includes('district:') || lowerLine.includes('distt-') || lowerLine.includes('distt:') || lowerLine.startsWith('district ') || lowerLine.includes('district-')) {
+          district = line.replace(/^.*dist(rict|t)[-:\s]*/i, '').trim();
         } else if (lowerLine.startsWith('pincode-') || lowerLine.includes('pincode:')) {
           pincode = line.replace(/^pincode[-:\s]+/i, '').trim();
         } else if (lowerLine.startsWith('state-') || lowerLine.includes('state:')) {
@@ -106,7 +115,10 @@ export default function FormatterPage() {
         }
       }
       if (cityVillage) {
-        firstLineParts.push(`VILL - ${cityVillage.toUpperCase()}`);
+        // Strip out "City-" or "W.No-04,Bajrang Mohalla," part if we want to extract village name properly,
+        // or just format the whole chunk to UPPERCASE.
+        let displayCity = cityVillage.toUpperCase();
+        firstLineParts.push(`VILL - ${displayCity}`);
       }
       if (tehsil) {
         firstLineParts.push(`TEHSIL - ${tehsil.toUpperCase()}`);

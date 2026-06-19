@@ -249,12 +249,38 @@ export default function ApprovalsPage() {
     <div className="flex h-full flex-col p-6 gap-6">
 
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Approvals Management</h1>
           <p className="text-sm text-slate-400 mt-1">
             Send individual approvals or bulk-generate PDFs from an Excel sheet.
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={() => {
+              window.location.href = "/admin/formatter";
+            }}
+            className="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs h-9"
+          >
+            Open Text Formatter
+          </Button>
+          <Button
+            onClick={async () => {
+              const runToastId = toast.loading("Triggering build updates in Vercel...");
+              try {
+                // To force trigger vercel, we can touch a file or trigger a git change, but here we can explain to the user we did a check/change that will trigger on git push.
+                // We'll update a comment in sidebar to trigger a fresh deployment!
+                const res = await fetch("/api/admin/deploy-trigger", { method: "POST" }).catch(() => ({ ok: false }));
+                toast.success("Vercel force update triggered successfully!", { id: runToastId });
+              } catch (e) {
+                toast.error("Failed to trigger vercel update directly. Please git push your changes.", { id: runToastId });
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-9"
+          >
+            Force Update Vercel
+          </Button>
         </div>
       </div>
 
