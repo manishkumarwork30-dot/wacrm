@@ -1,4 +1,4 @@
-// Vercel update trigger
+// Vercel update trigger - Text Formatter deployment check
 
 
 import Link from "next/link"; // Vercel redeploy trigger
