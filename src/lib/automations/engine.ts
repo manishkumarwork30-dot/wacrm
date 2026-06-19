@@ -483,6 +483,16 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       const waAccount = accounts?.[0];
       if (!waAccount) throw new Error('No WA account found');
 
+      // Fetch custom document template config
+      const { data: docTemplate } = await db
+        .from('message_templates')
+        .select('buttons')
+        .eq('user_id', args.automation.user_id)
+        .eq('name', '__document_config')
+        .maybeSingle();
+
+      const docConfig = docTemplate?.buttons || undefined;
+
       // Generate document
       const pdfBuffer = await generateCongratulationsDoc({
         name: lead.name || 'User',
@@ -493,7 +503,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         land_size: lead.land_size,
         ownership: lead.ownership,
         date: lead.updated_at || new Date().toISOString()
-      });
+      }, docConfig);
       const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
 
       // Upload to storage

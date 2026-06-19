@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Settings, Tag, User, Palette, MessageCircle } from 'lucide-react';
+import { Settings, Tag, User, Palette, MessageCircle, FileText } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { TagManager } from '@/components/settings/tag-manager';
@@ -10,6 +10,7 @@ import { PasswordForm } from '@/components/settings/password-form';
 import { SessionsCard } from '@/components/settings/sessions-card';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { ChatbotConfig } from '@/components/settings/chatbot-config';
+import { DocumentConfig } from '@/components/settings/document-config';
 
 const TAB_VALUES = [
   'profile',
@@ -17,6 +18,7 @@ const TAB_VALUES = [
   'tags',
   'appearance',
   'chatbot',
+  'document',
 ] as const;
 type TabValue = (typeof TAB_VALUES)[number];
 
@@ -89,6 +91,13 @@ export default function SettingsPage() {
             <MessageCircle className="size-4" />
             Tower Chatbot
           </TabsTrigger>
+          <TabsTrigger
+            value="document"
+            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+          >
+            <FileText className="size-4" />
+            Approval Document
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
@@ -113,6 +122,10 @@ export default function SettingsPage() {
 
         <TabsContent value="chatbot">
           <ChatbotConfig />
+        </TabsContent>
+
+        <TabsContent value="document">
+          <DocumentConfig />
         </TabsContent>
       </Tabs>
     </div>

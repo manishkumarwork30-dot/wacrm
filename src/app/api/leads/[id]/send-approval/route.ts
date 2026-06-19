@@ -106,6 +106,16 @@ export async function POST(
         .eq('id', leadId)
     }
 
+    // Fetch custom document template config
+    const { data: docTemplate } = await supabaseAdmin()
+      .from('message_templates')
+      .select('buttons')
+      .eq('user_id', lead.user_id)
+      .eq('name', '__document_config')
+      .maybeSingle();
+
+    const docConfig = docTemplate?.buttons || undefined;
+
     // 4. Generate the PDF Document
     const pdfBuffer = await generateCongratulationsDoc({
       name: finalName,
@@ -116,7 +126,7 @@ export async function POST(
       land_size: lead.land_size,
       ownership: lead.ownership,
       date: finalDate
-    });
+    }, docConfig);
 
     // 5. Upload to Supabase Storage
     const fileName = `approval_${leadId}_${Date.now()}.pdf`

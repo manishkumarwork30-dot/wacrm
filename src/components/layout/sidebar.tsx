@@ -86,6 +86,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       label: "Sent Approvals",
       icon: FileText,
     });
+    displayNavItems.push({
+      href: "/admin/formatter",
+      label: "Text Formatter",
+      icon: LayoutTemplate,
+    });
   }
 
   // Close the drawer when route changes — users opened it to navigate,

@@ -120,8 +120,85 @@ function drawPageHeader(
  * Fonts fetched from CDN; built-in Helvetica used as local fallback.
  * Survey-of-India watermark appears on every page.
  */
-export async function generateCongratulationsDoc(data: any): Promise<Uint8Array> {
-  const [fonts, assets] = await Promise.all([getFonts(), getAssets()]);
+export const DEFAULT_DOC_CONFIG = {
+  companyName: 'HTL NETWORK',
+  companyAddress: 'HTL NETWORK PVT. LTD. B/67, MALLESWARAM ROAD, 4th PHASE, MALLESWARAM INDUSTRIAL AREA, BANGALORE - 560003 INDIA',
+  approvalLetterTitle: 'LETTER OF APPROVAL',
+  paragraph1: `HTL NETWORK PVT. LTD. is looking for tower location across different state in India. We are very glad to inform that VI 5G NETWORK has agreed to install its NETWORK Tower with the given referenceDDD/KG/1044J/05G on the land referred by you. On the basis of your documents and suitability of your land space, the issue to be held. The agreement period is for 20 years and can be extend for further 15 years, if both parties agreed. In case of expanding of tower maturity period, the term and condition will be according to policies of the company in the financial year and laws of the government. After issued of your License certificate, our company will provide you a sum of Rs. 70 lacs as advance and rent of first month. During the agreement period the sum of Rs.60,000/-per month will be allocated for as rent with an increment of 10% per year (Out of rent allotted, 30,000 will be credited to your account and rest 30,000 will be deducted as EMI on 70 lacs Advance so that amount will be recovered within 20 years agreement\'s time period) and Rs. 22000/- as salary for security Guard. All the rule and regulation will be governed by companies ACT 1956 in case of any legal procedure.`,
+  paragraph2: `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
+  paragraph3: `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
+  paragraph4: `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
+  
+  advanceAmount: 'Rs. 70 lacs',
+  monthlyRent: 'Rs.60,000/-',
+  guardSalary: 'Rs. 22000/-',
+  agreementFee: 'Rs.2550/-',
+  interestRate: '2%',
+  agreementPeriod: '20 years',
+  incrementPercent: '10%',
+  
+  surveyLocationId: 'LOCATION - ID - VI / 5G 0001',
+  surveyReportText: 'THE SURVEY DEPARTMENT OF INDIA CONDUCTED SURVEY FOR THE TOWER INSTALLATION SURVEY REPORT IS POSITIVE WITH THE LAND PROPOSED BY YOU NOW VI 5G NETWORK HAS BEEN ALLOWED FOR FURTHER PROCESS NOW VI 5G NETWORK IS ALLOWED TO INSTALL TOWER AT GIVEN ABOVE ADDRESS THE SURVEY REPORT IS LIMITED AND CONFIDENTIAL.',
+  
+  logoUrl: 'https://htlnetwork.com/assets/images/logo.png',
+  qrUrl: 'https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png',
+  signatureUrl: 'https://i.ibb.co/Fqj8CGm3/signature.png',
+  stampUrl: 'https://i.ibb.co/v6cQ2rDC/approval-image.png',
+  watermarkUrl: 'https://i.ibb.co/PZKK8CZ4/Survey-Of-India.png',
+  hdrP2P3Url: 'https://i.ibb.co/hJpwPfZd/Picture3.png',
+  hdrP4Url: 'https://i.ibb.co/hJpwPfZd/Picture3.png',
+  p3img1Url: 'https://i.ibb.co/b0wmpr0/Picture7.png',
+  p3img2Url: 'https://i.ibb.co/CpYqYxP0/Picture8.png',
+  p4img1Url: 'https://i.ibb.co/Xrfg6kYb/Picture9.png',
+  p4img2Url: 'https://i.ibb.co/YBkM6RZq/Picture10.png',
+};
+
+export async function getAssetsWithOverrides(customConfig?: any) {
+  const defaults = await getAssets();
+  if (!customConfig) return defaults;
+  
+  const overrides: any = { ...defaults };
+  const keys = [
+    ['logo', 'logoUrl'],
+    ['qr', 'qrUrl'],
+    ['signature', 'signatureUrl'],
+    ['stamp', 'stampUrl'],
+    ['watermark', 'watermarkUrl'],
+    ['hdrP2P3', 'hdrP2P3Url'],
+    ['hdrP4', 'hdrP4Url'],
+    ['p3img1', 'p3img1Url'],
+    ['p3img2', 'p3img2Url'],
+    ['p4img1', 'p4img1Url'],
+    ['p4img2', 'p4img2Url'],
+  ];
+  
+  await Promise.all(
+    keys.map(async ([assetKey, configKey]) => {
+      const url = customConfig[configKey];
+      if (url && url !== (DEFAULT_DOC_CONFIG as any)[configKey]) {
+        const buf = await fetchBuffer(url);
+        if (buf) {
+          overrides[assetKey] = buf;
+        }
+      }
+    })
+  );
+  
+  return overrides;
+}
+
+function formatParagraph(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => {
+    return vars[key] !== undefined ? vars[key] : `{{${key}}}`;
+  });
+}
+
+export async function generateCongratulationsDoc(data: any, customConfig?: any): Promise<Uint8Array> {
+  const cfg = { ...DEFAULT_DOC_CONFIG, ...customConfig };
+  const [fonts, assets] = await Promise.all([
+    getFonts(),
+    getAssetsWithOverrides(customConfig),
+  ]);
 
   return new Promise((resolve, reject) => {
     try {
@@ -167,7 +244,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       // Company title on the right
       doc.save();
       doc.fillColor('#1e3a8a'); // Professional dark blue
-      doc.font(B).fontSize(40).text('HTL NETWORK', 200, 45, { width: 355, align: 'right', characterSpacing: 2 });
+      doc.font(B).fontSize(40).text(cfg.companyName, 200, 45, { width: 355, align: 'right', characterSpacing: 2 });
       doc.restore();
 
       // Header divider
@@ -179,7 +256,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
 
       // APPROVAL LETTER title
       doc.font(B).fontSize(16).fillColor('#1e3a8a')
-        .text('LETTER OF APPROVAL', { align: 'center', underline: true });
+        .text(cfg.approvalLetterTitle, { align: 'center', underline: true });
       doc.moveDown(1.5);
 
       // Date
@@ -211,28 +288,49 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
       doc.moveDown(0.8);
       doc.font(B).fontSize(11).text(`Mr. ${finalName}`, 40, doc.y);
-      doc.font(B).fontSize(11).text(`District ${finalLocation}`, 40, doc.y);
+      doc.font(B).fontSize(11).text(`District - ${finalLocation}`, 40, doc.y);
       doc.moveDown(1.2);
+
+      // Interpolation vars map
+      const pVars: Record<string, string> = {
+        name: finalName,
+        location: finalLocation,
+        mobile_no: mobile_no || 'N/A',
+        state: finalState,
+        pin_code: pin_code || 'N/A',
+        land_size: finalLandSize,
+        ownership: finalOwnership,
+        date: formattedDate,
+        companyName: cfg.companyName,
+        approvalLetterTitle: cfg.approvalLetterTitle,
+        advanceAmount: cfg.advanceAmount,
+        monthlyRent: cfg.monthlyRent,
+        guardSalary: cfg.guardSalary,
+        agreementFee: cfg.agreementFee,
+        interestRate: cfg.interestRate,
+        agreementPeriod: cfg.agreementPeriod,
+        incrementPercent: cfg.incrementPercent,
+      };
 
       // Body paragraphs
       doc.font(R).fontSize(9.5).fillColor('black');
       doc.text(
-        `HTL NETWORK PVT. LTD. is looking for tower location across different state in India. We are very glad to inform that VI 5G NETWORK has agreed to install its NETWORK Tower with the given referenceDDD/KG/1044J/05G on the land referred by you. On the basis of your documents and suitability of your land space, the issue to be held. The agreement period is for 20 years and can be extend for further 15 years, if both parties agreed. In case of expanding of tower maturity period, the term and condition will be according to policies of the company in the financial year and laws of the government. After issued of your License certificate, our company will provide you a sum of Rs. 70 lacs as advance and rent of first month. During the agreement period the sum of Rs.60,000/-per month will be allocated for as rent with an increment of 10% per year (Out of rent allotted, 30,000 will be credited to your account and rest 30,000 will be deducted as EMI on 70 lacs Advance so that amount will be recovered within 20 years agreement\'s time period) and Rs. 22000/- as salary for security Guard. All the rule and regulation will be governed by companies ACT 1956 in case of any legal procedure.`,
+        formatParagraph(cfg.paragraph1, pVars),
         40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
-        `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
+        formatParagraph(cfg.paragraph2, pVars),
         40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
-        `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
+        formatParagraph(cfg.paragraph3, pVars),
         40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
-        `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
+        formatParagraph(cfg.paragraph4, pVars),
         40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
 
@@ -272,7 +370,7 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       doc.save();
       doc.moveTo(40, 740).lineTo(555, 740).strokeColor('black').lineWidth(1.5).stroke();
       doc.font(B).fontSize(8).fillColor('black').text(
-        'HTL NETWORK PVT. LTD. B/67, MALLESWARAM ROAD, 4th PHASE, MALLESWARAM INDUSTRIAL AREA, BANGALORE - 560003 INDIA',
+        cfg.companyAddress,
         40, 748, { align: 'center', width: 515 }
       );
       doc.restore();
@@ -288,11 +386,11 @@ export async function generateCongratulationsDoc(data: any): Promise<Uint8Array>
       const p2ContentY = doc.y + 10;
 
       doc.fontSize(12).font(B).fillColor('black').text('DEAR, PROSPECTIVE LANDLORD', 50, p2ContentY);
-      doc.fillColor('blue').fontSize(14).text('LOCATION - ID - VI / 5G 0001', 50, p2ContentY + 20);
+      doc.fillColor('blue').fontSize(14).text(cfg.surveyLocationId, 50, p2ContentY + 20);
 
       doc.moveDown(1.5);
       doc.fillColor('black').fontSize(10).font(R).text(
-        'THE SURVEY DEPARTMENT OF INDIA CONDUCTED SURVEY FOR THE TOWER INSTALLATION SURVEY REPORT IS POSITIVE WITH THE LAND PROPOSED BY YOU NOW VI 5G NETWORK HAS BEEN ALLOWED FOR FURTHER PROCESS NOW VI 5G NETWORK IS ALLOWED TO INSTALL TOWER AT GIVEN ABOVE ADDRESS THE SURVEY REPORT IS LIMITED AND CONFIDENTIAL.',
+        formatParagraph(cfg.surveyReportText, pVars),
         50, doc.y, { align: 'justify', lineGap: 2 }
       );
       doc.moveDown(1.5);

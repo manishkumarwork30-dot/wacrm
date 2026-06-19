@@ -67,6 +67,16 @@ export async function GET(req: Request) {
 
     for (const lead of leads) {
       try {
+        // Fetch custom document template config
+        const { data: docTemplate } = await db
+          .from('message_templates')
+          .select('buttons')
+          .eq('user_id', lead.user_id)
+          .eq('name', '__document_config')
+          .maybeSingle();
+
+        const docConfig = docTemplate?.buttons || undefined;
+
         // 2. Generate PDF using dynamic data instead of just name and location
         // We pass the lead object
         const pdfBytes = await generateCongratulationsDoc({
@@ -78,7 +88,7 @@ export async function GET(req: Request) {
           land_size: lead.land_size,
           ownership: lead.ownership,
           date: lead.approval_date || lead.updated_at || new Date().toISOString()
-        });
+        }, docConfig);
         const filename = `Approval_Letter_${lead.name || 'User'}.pdf`;
 
         // 2. Upload to Supabase Storage temporarily (create a bucket named "documents" if it doesn't exist)

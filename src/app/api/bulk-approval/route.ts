@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { generateCongratulationsDoc, getFonts, getAssets } from '@/lib/document-generator';
+import { createClient } from '@/lib/supabase/server';
 
 const MAX_ROWS = 100;
 
@@ -94,6 +95,23 @@ export async function POST(request: Request) {
       rows = rawRows;
     }
 
+    // Fetch custom document template config
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    let docConfig = undefined;
+    if (user) {
+      const { data: docTemplate } = await supabase
+        .from('message_templates')
+        .select('buttons')
+        .eq('user_id', user.id)
+        .eq('name', '__document_config')
+        .maybeSingle();
+      if (docTemplate) {
+        docConfig = docTemplate.buttons || undefined;
+      }
+    }
+
     // Limit rows
     const rowsToProcess = rows.slice(0, MAX_ROWS);
     const today = new Date();
@@ -123,7 +141,7 @@ export async function POST(request: Request) {
           name,
           location: district,
           date: date || todayStr,
-        });
+        }, docConfig);
 
         // Format filename as "name.pdf" (lowercase/same case, clean special chars)
         // If duplicate name exists, append counter e.g., "Manish 1.pdf", "Manish 2.pdf"
