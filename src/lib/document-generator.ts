@@ -234,10 +234,10 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       drawWatermark(doc, assets.watermark);
 
       // Logo Left & Company Title side-by-side (Header box)
-      const headerBoxY = 20;
+      const headerBoxY = 25;
       if (assets.logo) {
         try {
-          doc.image(assets.logo, 40, headerBoxY, { width: 110, height: 80 }); // logo shifted left (x=40) and height adjusted
+          doc.image(assets.logo, 40, headerBoxY, { width: 90, height: 60 }); // logo height set to 60
         } catch {
           _drawFallbackTower(doc, 40, headerBoxY);
         }
@@ -245,21 +245,21 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         _drawFallbackTower(doc, 40, headerBoxY);
       }
 
-      // Title Text side-by-side (Size and vertical positioning matched to logo height)
+      // Title Text side-by-side (Matched to logo height by font size and y-offset adjustment)
       doc.save();
       doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(54).text('HTL NETWORK', 160, headerBoxY + 12, { // text size increased to match logo height
-        width: 390,
+      doc.font(B).fontSize(45).text('HTL NETWORK', 145, headerBoxY + 8, { // font size 45 equals approx 60px height
+        width: 410,
         align: 'left',
         characterSpacing: 0.5
       });
       doc.restore();
 
       // Bold blue divider line matching the mockup layout (closer to header content)
-      doc.moveTo(40, 108).lineTo(555, 108).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
+      doc.moveTo(40, 95).lineTo(555, 95).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
 
       doc.x = 40;
-      doc.y = 112; // Reduced gap below the divider line
+      doc.y = 99; // Reduced gap below the divider line
       
       // APPROVAL LETTER title centered below header
       doc.save();
