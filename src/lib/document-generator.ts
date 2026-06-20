@@ -234,10 +234,10 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       drawWatermark(doc, assets.watermark);
 
       // Logo Left & Company Title side-by-side (Header box)
-      const headerBoxY = 25;
+      const headerBoxY = 15;
       if (assets.logo) {
         try {
-          doc.image(assets.logo, 40, headerBoxY, { width: 90, height: 60 }); // logo height set to 60
+          doc.image(assets.logo, 40, headerBoxY, { width: 130, height: 100 }); // logo height scaled to 100
         } catch {
           _drawFallbackTower(doc, 40, headerBoxY);
         }
@@ -245,13 +245,13 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         _drawFallbackTower(doc, 40, headerBoxY);
       }
 
-      // Title Text side-by-side (Matched to logo height by font size and y-offset adjustment)
+      // Title Text side-by-side (fontSize 72 for ~100px height. Width set to 380 so it fits side-by-side without wrapping)
       doc.save();
       doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(45).text('HTL NETWORK', 145, headerBoxY + 8, { // font size 45 equals approx 60px height
-        width: 410,
+      doc.font(B).fontSize(72).text('HTL NETWORK', 170, headerBoxY + 12, { // large font size matching logo height
+        width: 380,
         align: 'left',
-        characterSpacing: 0.5
+        characterSpacing: 0
       });
       doc.restore();
 
