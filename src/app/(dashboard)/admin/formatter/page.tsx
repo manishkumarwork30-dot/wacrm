@@ -56,28 +56,29 @@ export default function FormatterPage() {
 
         const lowerLine = line.toLowerCase();
 
-        // Check for fields
-        if (lowerLine.startsWith('city-') || lowerLine.includes('city:') || lowerLine.startsWith('village-') || lowerLine.startsWith('vill-') || lowerLine.includes('bajrang mohalla')) {
-          // If bajrang mohalla line and contains city info
-          let cleanVal = line;
-          if (lowerLine.startsWith('city-')) {
-            cleanVal = line.replace(/^city-[-:\s]*/i, '');
-          }
-          cityVillage = cleanVal.trim();
-        } else if (lowerLine.includes('tehsil-') || lowerLine.includes('tehsil:')) {
-          // Could be "Post Office -Tehsil- Narsingh Garh"
-          const parts = line.split(/tehsil[-:\s]*/i);
-          tehsil = parts[1]?.trim() || '';
-        } else if (lowerLine.includes('district-') || lowerLine.includes('district:') || lowerLine.includes('distt-') || lowerLine.includes('distt:') || lowerLine.startsWith('district ') || lowerLine.includes('district-')) {
-          district = line.replace(/^.*dist(rict|t)[-:\s]*/i, '').trim();
-        } else if (lowerLine.startsWith('pincode-') || lowerLine.includes('pincode:')) {
-          pincode = line.replace(/^pincode[-:\s]+/i, '').trim();
-        } else if (lowerLine.startsWith('state-') || lowerLine.includes('state:')) {
-          state = line.replace(/^state[-:\s]+/i, '').trim();
-        } else if (lowerLine.startsWith('m.no-') || lowerLine.includes('m.no:') || lowerLine.startsWith('mobile-') || lowerLine.startsWith('mobile no-') || lowerLine.includes('mobile:')) {
-          mobile = line.replace(/^(m\.no|mobile|mobile no)[-:\s]+/i, '').trim();
-        } else if (lowerLine.startsWith('applier name-') || lowerLine.includes('applier name:') || lowerLine.startsWith('applicant name-')) {
-          applierName = line.replace(/^(applier name|applicant name)[-:\s]+/i, '').trim();
+        // Check for fields using regular expressions for maximum flexibility
+        const cityMatch = line.match(/^(?:city|village|vill)(?:age)?[-:\s]*(.*)/i) || (lowerLine.includes('bajrang mohalla') ? [line, line] : null);
+        const tehsilMatch = line.match(/(?:tehsil|tahsil)[-:\s]*(.*)/i);
+        const distMatch = line.match(/(?:district|distt|dist)[-:\s]*(.*)/i);
+        const pinMatch = line.match(/(?:pincode|pin\s*code|pin)[-:\s]*(.*)/i);
+        const stateMatch = line.match(/(?:state)[-:\s]*(.*)/i);
+        const mobileMatch = line.match(/(?:m\.?\s*no\.?|mob(?:ile)?(?:\s*no\.?)?(?:\s*number)?|contact|phone|ph)[-:\s]+(.*)/i) || line.match(/^(?:m\.?\s*no\.?|mob(?:ile)?(?:\s*no\.?)?(?:\s*number)?|contact|phone|ph)\s*(.*)/i);
+        const applierMatch = line.match(/(?:applier\s*name|applicant\s*name|applier|applicant)[-:\s]*(.*)/i);
+
+        if (cityMatch) {
+          cityVillage = cityMatch[1].trim();
+        } else if (tehsilMatch) {
+          tehsil = tehsilMatch[1].trim();
+        } else if (distMatch) {
+          district = distMatch[1].trim();
+        } else if (pinMatch) {
+          pincode = pinMatch[1].trim();
+        } else if (stateMatch) {
+          state = stateMatch[1].trim();
+        } else if (mobileMatch) {
+          mobile = mobileMatch[1].trim();
+        } else if (applierMatch) {
+          applierName = applierMatch[1].trim();
         }
       }
 
