@@ -234,32 +234,32 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       drawWatermark(doc, assets.watermark);
 
       // Logo Left & Company Title side-by-side (Header box)
-      const headerBoxY = 25;
+      const headerBoxY = 20;
       if (assets.logo) {
         try {
-          doc.image(assets.logo, 50, headerBoxY, { width: 100, height: 75 });
+          doc.image(assets.logo, 45, headerBoxY, { width: 110, height: 85 });
         } catch {
-          _drawFallbackTower(doc, 50, headerBoxY);
+          _drawFallbackTower(doc, 45, headerBoxY);
         }
       } else {
-        _drawFallbackTower(doc, 50, headerBoxY);
+        _drawFallbackTower(doc, 45, headerBoxY);
       }
 
-      // Title Text side-by-side
+      // Title Text side-by-side (Slightly larger font size and optimized alignment)
       doc.save();
       doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(48).text('HTL NETWORK', 170, headerBoxY + 12, {
-        width: 380,
+      doc.font(B).fontSize(56).text('HTL NETWORK', 165, headerBoxY + 12, {
+        width: 390,
         align: 'left',
-        characterSpacing: 1.5
+        characterSpacing: 0.5
       });
       doc.restore();
 
-      // Bold blue divider line matching the mockup layout
-      doc.moveTo(40, 115).lineTo(555, 115).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
+      // Bold blue divider line matching the mockup layout (adjusted Y position)
+      doc.moveTo(40, 112).lineTo(555, 112).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
 
       doc.x = 40;
-      doc.y = 125;
+      doc.y = 117; // Reduced gap between line and "APPROVAL LETTER"
       
       // APPROVAL LETTER title centered below header
       doc.save();
@@ -269,10 +269,10 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Underline style (red line under APPROVAL LETTER text)
       const titleWidth = doc.widthOfString('APPROVAL LETTER');
       const startX = (595.28 - titleWidth) / 2;
-      doc.moveTo(startX, doc.y + 2).lineTo(startX + titleWidth, doc.y + 2).strokeColor('red').lineWidth(2).stroke();
+      doc.moveTo(startX, doc.y + 1).lineTo(startX + titleWidth, doc.y + 1).strokeColor('red').lineWidth(2).stroke();
       doc.restore();
       
-      doc.moveDown(1.8);
+      doc.moveDown(1.1);
 
       // Date
       let formattedDate: string;
