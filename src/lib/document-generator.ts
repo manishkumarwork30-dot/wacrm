@@ -233,31 +233,46 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Watermark (drawn first so content renders on top)
       drawWatermark(doc, assets.watermark);
 
-      // Top-left Logo
+      // Logo Left & Company Title side-by-side (Header box)
+      const headerBoxY = 25;
       if (assets.logo) {
-        try { doc.image(assets.logo, 60, 20, { width: 150, height: 100 }); }
-        catch { _drawFallbackTower(doc, 40, 20); }
+        try {
+          doc.image(assets.logo, 50, headerBoxY, { width: 100, height: 75 });
+        } catch {
+          _drawFallbackTower(doc, 50, headerBoxY);
+        }
       } else {
-        _drawFallbackTower(doc, 40, 20);
+        _drawFallbackTower(doc, 50, headerBoxY);
       }
 
-      // Company title on the right
+      // Title Text side-by-side
       doc.save();
-      doc.fillColor('#1e3a8a'); // Professional dark blue
-      doc.font(B).fontSize(40).text(cfg.companyName, 200, 45, { width: 355, align: 'right', characterSpacing: 2 });
+      doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
+      doc.font(B).fontSize(48).text('HTL NETWORK', 170, headerBoxY + 12, {
+        width: 380,
+        align: 'left',
+        characterSpacing: 1.5
+      });
       doc.restore();
 
-      // Header divider
-      doc.moveTo(40, 140).lineTo(555, 140).strokeColor('#2563eb').lineWidth(2).stroke();
-      // doc.moveTo(40, 144).lineTo(555, 144).strokeColor('#93c5fd').lineWidth(1).stroke();
+      // Bold blue divider line matching the mockup layout
+      doc.moveTo(40, 115).lineTo(555, 115).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
 
       doc.x = 40;
-      doc.y = 160;
-
-      // APPROVAL LETTER title
-      doc.font(B).fontSize(16).fillColor('#1e3a8a')
-        .text(cfg.approvalLetterTitle, { align: 'center', underline: true });
-      doc.moveDown(1.5);
+      doc.y = 125;
+      
+      // APPROVAL LETTER title centered below header
+      doc.save();
+      doc.font(B).fontSize(14).fillColor('#0026e6')
+        .text('APPROVAL LETTER', { align: 'center' });
+      
+      // Underline style (red line under APPROVAL LETTER text)
+      const titleWidth = doc.widthOfString('APPROVAL LETTER');
+      const startX = (595.28 - titleWidth) / 2;
+      doc.moveTo(startX, doc.y + 2).lineTo(startX + titleWidth, doc.y + 2).strokeColor('red').lineWidth(2).stroke();
+      doc.restore();
+      
+      doc.moveDown(1.8);
 
       // Date
       let formattedDate: string;
