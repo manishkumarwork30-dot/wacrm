@@ -248,15 +248,15 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Title Text side-by-side (fontSize 72 for ~100px height. Width set to 380 so it fits side-by-side without wrapping)
       doc.save();
       doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(64).text('HTL NETWORK', 120, headerBoxY + 12, { // large font size matching logo height
-        width: 300,
+      doc.font(B).fontSize(60).text('HTL NETWORK', 120, headerBoxY + 12, { // large font size matching logo height
+        width: 500,
         align: 'left',
         characterSpacing: 0
       });
       doc.restore();
 
       // Bold blue divider line matching the mockup layout (closer to header content)
-      doc.moveTo(0, 115).lineTo(555, 105).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
+      doc.moveTo(0, 115).lineTo(660, 115).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
 
       doc.x = 40;
       doc.y = 99; // Reduced gap below the divider line
@@ -296,14 +296,14 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(12).fillColor('black').text(`Date : ${formattedDate}`, 40, doc.y);
+      doc.font(R).fontSize(13).fillColor('black').text(`Date : ${formattedDate}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(18).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
+      doc.font(B).fontSize(14).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
       doc.moveDown(0.8);
-      doc.font(B).fontSize(18).text(`Mr. ${finalName}`, 40, doc.y);
-      doc.font(B).fontSize(18).text(`District-${finalLocation}`, 40, doc.y);
+      doc.font(B).fontSize(16).text(`Mr. ${finalName}`, 40, doc.y);
+      doc.font(B).fontSize(16).text(`District-${finalLocation}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map
@@ -342,7 +342,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
       const signY = 560;
-      const leftX = 80;
+      const leftX = 120;
       const rightX = 300;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
       doc.font(B).fontSize(12).fillColor('black').text('Authorized Signatory', leftX, signY);
@@ -374,7 +374,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Footer
       doc.save();
       doc.moveTo(0, 740).lineTo(595, 740).strokeColor('black').lineWidth(1.5).stroke();
-      doc.font(B).fontSize(18).fillColor('black').text(
+      doc.font(B).fontSize(14).fillColor('black').text(
         cfg.companyAddress,
         0, 748, { align: 'center', width: 595 }
       );
