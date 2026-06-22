@@ -23,39 +23,43 @@ export interface FormattedEntry {
  *   • Timestamp lines that start with "[".
  *   • Sender lines that begin with a phone number.
  *   • Inconsistent label spellings (e.g. "Disst", "Distt").
- *   • Optional two‑letter state‑code lines.
+ *   • Optional two‑letter state‑code lines (e.g. PR, RN).
  */
 export function formatWhatsAppText(rawText: string): FormattedEntry[] {
-  // 1️⃣ Remove timestamp / sender lines
+  // 1️⃣ Strip out timestamp lines and lines that start with a phone number
   const cleaned = rawText
     .split(/\r?\n/)
     .filter(
       line =>
         !line.trim().startsWith('[') && // timestamps like "[5:00 pm, 18/6/2026]"
-        !/^\+?\d{1,3}\s*\d{5,}/.test(line.trim()) // lines starting with a phone number
+        !/^\+?\d{1,3}\s*\d{5,}/.test(line.trim()) // lines that are just a phone number prefix
     )
     .join('\n');
 
-  // 2️⃣ Split into blocks – blank line separates distinct entries
-  const blocks = cleaned
+  // 2️⃣ Split on blank lines – each block should represent one person's data (or a lone state code)
+  const rawBlocks = cleaned
     .split(/\n\s*\n/)
     .map(b => b.trim())
     .filter(Boolean);
 
-  const interim: FormattedEntry[] = [];
+  const result: FormattedEntry[] = [];
+  let previousEntry: FormattedEntry | null = null;
 
-  for (const block of blocks) {
+  for (const block of rawBlocks) {
+    const lines = block.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    // If the block is just a two‑letter state code, attach it to the previous entry
+    if (lines.length === 1 && /^[A-Z]{2}$/.test(lines[0])) {
+      if (previousEntry) {
+        previousEntry.stateCode = lines[0];
+      }
+      continue;
+    }
+
     const entry: FormattedEntry = { name: '' };
-    const lines = block.split(/\r?\n/).map(l => l.trim());
 
     for (const line of lines) {
-      // Detect a lone two‑letter state code line (e.g. "PR")
-      if (/^[A-Z]{2}$/.test(line)) {
-        entry.stateCode = line;
-        continue;
-      }
-
-      // Detect combined name and relation line like "Kallu S/O Baburam"
+      // 3️⃣ Detect combined name + relation (e.g. "Kallu S/O Baburam")
       const nameRelMatch = line.match(/^(.*?)\s+(S\/O|W\/O)\s+(.*)$/i);
       if (nameRelMatch) {
         entry.name = nameRelMatch[1].trim();
@@ -63,13 +67,24 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
         continue;
       }
 
-      // Split on the first ':' or '-' to get a key/value pair
-      const [keyRaw, ...rest] = line.split(/[:\-]/);
-      const key = keyRaw.trim().toLowerCase();
-      const value = rest.join(':').trim();
+      // 4️⃣ Split on first ':' if present; otherwise split on the first '-' while preserving the dash in the value
+      let key: string;
+      let value: string;
+      if (line.includes(':')) {
+        const [keyRaw, ...rest] = line.split(':');
+        key = keyRaw.trim().toLowerCase();
+        value = rest.join(':').trim();
+      } else if (line.includes('-')) {
+        const idx = line.indexOf('-');
+        const keyRaw = line.slice(0, idx);
+        key = keyRaw.trim().toLowerCase();
+        value = line.slice(idx + 1).trim(); // keep any dash inside the value
+      } else {
+        continue; // unrecognizable line
+      }
       if (!value) continue;
 
-      // Fuzzy matching of known fields
+      // 5️⃣ Map the key to the appropriate field (fuzzy matching)
       if (/(^|\s)name$/i.test(key) && !entry.name) {
         entry.name = value;
       } else if (/(s\/o|w\/o|spouse|son|daughter)/i.test(key)) {
@@ -93,28 +108,18 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
       }
     }
 
-    // Fallback: if name is still empty, use the first line as a guess
-    if (!entry.name && lines.length) {
+    // Fallback: if we still have no name and the block has more than one line, use the first line as a guess
+    if (!entry.name && lines.length > 1) {
       entry.name = lines[0];
     }
 
-    // Keep entry if it has any meaningful data
+    // Only keep entries that have at least one meaningful field
     const hasData = entry.stateCode || entry.name || entry.relation || entry.village || entry.postOffice || entry.tehsil || entry.district || entry.pincode || entry.state || entry.phone || entry.applicantName;
     if (hasData) {
-      interim.push(entry);
+      result.push(entry);
+      previousEntry = entry;
     }
   }
 
-  // Merge solitary state‑code entries into the previous record
-  const final: FormattedEntry[] = [];
-  for (const e of interim) {
-    const isStateOnly = e.stateCode && !e.name && !e.relation && !e.village && !e.postOffice && !e.tehsil && !e.district && !e.pincode && !e.state && !e.phone && !e.applicantName;
-    if (isStateOnly && final.length) {
-      final[final.length - 1].stateCode = e.stateCode;
-    } else {
-      final.push(e);
-    }
-  }
-
-  return final;
+  return result;
 }
