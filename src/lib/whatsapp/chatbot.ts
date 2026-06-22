@@ -386,13 +386,10 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         pin_code: collectedData.pin_code || '',
         land_size: collectedData.land_size,
         ownership: '',
-        status: 'Pending - Size Collected'
+        status: 'Pending - Land Size Collected'
       }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
 
-      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, askOwnershipMsg, [
-        { id: 'yes_owner', title: 'हाँ (Yes)' },
-        { id: 'no_owner', title: 'नहीं (No)' }
-      ]);
+      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, askOwnershipMsg);
       return true;
     }
 
@@ -400,41 +397,80 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
       collectedData.is_owned = textClean;
       await db.from('tower_leads').update({ ownership: textClean }).eq('contact_id', contactId);
 
-      const { data: lead } = await db.from('tower_leads').select('id').eq('contact_id', contactId).maybeSingle();
-      collectedData.lead_id = lead?.id;
-
-      await postToGoogleSheets({
-        name: collectedData.name || 'Unknown',
-        mobile_no: collectedData.mobile_no || senderPhone,
-        location: collectedData.location || 'Not provided',
-        state: collectedData.state || '',
-        pin_code: collectedData.pin_code || '',
-        land_size: collectedData.land_size || '',
-        ownership: textClean,
-        status: 'Pending'
-      }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
-
       await db.from('chatbot_runs').update({
         state: 'AWAITING_TERMS_AGREEMENT',
         collected_data: collectedData,
         updated_at: new Date().toISOString()
       }).eq('id', run.id);
 
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, surveyMsg);
+      await postToGoogleSheets({
+        name: collectedData.name || 'Unknown',
+        mobile_no: collectedData.mobile_no || senderPhone,
+        location: collectedData.location || '',
+        state: collectedData.state || '',
+        pin_code: collectedData.pin_code || '',
+        land_size: collectedData.land_size || '',
+        ownership: collectedData.is_owned,
+        status: 'Pending - Ownership Collected'
+      }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
 
-      const termsPrompt = `👉 क्या आप ऊपर दी गई शर्तों से सहमत हैं और आगे बढ़ना चाहते हैं?`;
-      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, termsPrompt, [
-        { id: 'yes_terms', title: 'YES (सहमत)' },
-        { id: 'no_terms', title: 'NO (असहमत)' }
+      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, surveyMsg, [
+        { id: 'yes_terms', title: 'YES' },
+        { id: 'no_terms', title: 'NO' }
       ]);
       return true;
     }
 
     case 'AWAITING_TERMS_AGREEMENT': {
-      const isYes = ['yes', 'yes.', 'yes,', 'हाँ', 'हाँ।', 'ha', 'haa', 'han', 'agree', 'y', 'yes_terms', 'yes (सहमत)'].some(k => textLower.includes(k));
-      const isNo = ['no', 'no.', 'no,', 'नहीं', 'नही', 'not interested', 'n', 'no_terms', 'no (असहमत)'].some(k => textLower.includes(k));
+      const isYes = ['yes', 'yes.', 'yes,', 'interested', 'हाँ', 'हाँ।', 'है', 'ha', 'haa', 'han', 'y', 'yes_terms'].some(k => textLower.includes(k));
+      const isNo = ['no', 'no.', 'no,', 'नहीं', 'नही', 'nah', 'n', 'no_terms'].some(k => textLower.includes(k));
+      const { data: lead } = await db.from('tower_leads').select('id').eq('contact_id', contactId).maybeSingle();
+      const leadId = lead?.id;
 
-      const leadId = collectedData.lead_id;
+      // Schedule Approval PDF generation for next day between 9 AM and 1 PM
+      try {
+        console.log('[chatbot] Scheduling Approval PDF generation for next day.');
+        const scheduledAt = new Date();
+        // Set to next day 9:00 AM
+        scheduledAt.setDate(scheduledAt.getDate() + 1);
+        scheduledAt.setHours(9, 0, 0, 0);
+
+        // Insert a task into a new table `approval_queue`
+        await db.from('approval_queue').insert({
+          lead_id: leadId || null,
+          contact_id: contactId,
+          conversation_id: conversationId,
+          phone_number_id: phoneNumberId,
+          access_token: accessToken,
+          recipient_phone: senderPhone,
+          collected_data: collectedData,
+          scheduled_at: scheduledAt.toISOString(),
+          status: 'pending',
+        });
+
+        // Update Google Sheet to reflect scheduled approval
+        await postToGoogleSheets({
+          name: collectedData.name || 'Unknown',
+          mobile_no: collectedData.mobile_no || senderPhone,
+          location: collectedData.location || 'Not provided',
+          state: collectedData.state || '',
+          pin_code: collectedData.pin_code || '',
+          land_size: collectedData.land_size || '',
+          ownership: collectedData.is_owned || '',
+          status: 'Approval Scheduled',
+        }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
+
+        // Inform the user that approval will be sent tomorrow
+        await sendAndLogBotMessage(
+          conversationId,
+          phoneNumberId,
+          accessToken,
+          senderPhone,
+          'आपका आवेदन स्वीकृति के लिए शेड्यूल किया गया है। अगली दिन सुबह 9 बजे से 1 बजे के बीच आपको स्वीकृति PDF भेजी जाएगी।'
+        );
+      } catch (scheduleErr) {
+        console.error('[chatbot] Failed to schedule Approval PDF:', scheduleErr);
+      }
 
       if (isYes) {
         if (leadId) {
