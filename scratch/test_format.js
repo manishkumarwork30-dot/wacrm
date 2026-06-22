@@ -1,18 +1,31 @@
 const inputText = `HTL Network 
 Omprakash Vishwakarma S/O Ramnarayan Vishwakarma 
 City- W.No-04,Bajrang Mohalla,Surajpur Nake ke Pass,Behrasia Road
-Post Office -Tehsil- Narsingh Garh 
- District- Rajgarh 
+tehsil Narsingh Garh 
+District- Rajgarh 
 Pincode- 465669 
 State- Madhya Pradesh 
-M.no- 9993192017
+mobile 9993192017
 Applier Name- Omprakash Vishwakarma 
 
-RJ`;
+RJ
 
-const formatText = (inputText) => {
-  const lines = inputText.split("\n").map(l => l.trim()).filter(Boolean);
-  
+HTL Network 
+Veer Bhan Singh S/O Omprakash 
+City- Vill - Ruriya
+tehsil Ghiror 
+District- Mainpuri 
+Pincode- 205130 
+State- Uttar Pradesh 
+m.no- 9993192017
+Applier Name- Omprakash 
+
+UP`;
+
+const formatSingleBlock = (blockText) => {
+  const lines = blockText.split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return "";
+
   let applicantName = '';
   let fatherName = '';
   let cityVillage = '';
@@ -34,8 +47,10 @@ const formatText = (inputText) => {
   }
 
   for (let line of lines) {
+    const upperLine = line.toUpperCase();
+    
     // Check for S/O line
-    if (line.toUpperCase().includes(' S/O ') || line.toUpperCase().includes(' S/O')) {
+    if (upperLine.includes(' S/O ') || upperLine.includes(' S/O')) {
       const parts = line.split(/\s+s\/o\s*/i);
       if (parts.length >= 2) {
         applicantName = parts[0].trim();
@@ -48,21 +63,29 @@ const formatText = (inputText) => {
 
     const lowerLine = line.toLowerCase();
 
-    // Check for fields
-    if (lowerLine.startsWith('city-') || lowerLine.includes('city:') || lowerLine.startsWith('village-') || lowerLine.startsWith('vill-')) {
-      cityVillage = line.replace(/^(city|village|vill)[-:\s]+/i, '').trim();
-    } else if (lowerLine.includes('tehsil-') || lowerLine.includes('tehsil:')) {
-      tehsil = line.split(/tehsil[-:\s]+/i)[1]?.trim() || '';
-    } else if (lowerLine.includes('district-') || lowerLine.includes('district:') || lowerLine.includes('distt-') || lowerLine.includes('distt:') || lowerLine.startsWith('district ')) {
-      district = line.replace(/^.*dist(rict|t)[-:\s]+/i, '').trim();
-    } else if (lowerLine.startsWith('pincode-') || lowerLine.includes('pincode:')) {
-      pincode = line.replace(/^pincode[-:\s]+/i, '').trim();
-    } else if (lowerLine.startsWith('state-') || lowerLine.includes('state:')) {
-      state = line.replace(/^state[-:\s]+/i, '').trim();
-    } else if (lowerLine.startsWith('m.no-') || lowerLine.includes('m.no:') || lowerLine.startsWith('mobile-') || lowerLine.startsWith('mobile no-') || lowerLine.includes('mobile:')) {
-      mobile = line.replace(/^(m\.no|mobile|mobile no)[-:\s]+/i, '').trim();
-    } else if (lowerLine.startsWith('applier name-') || lowerLine.includes('applier name:') || lowerLine.startsWith('applicant name-')) {
-      applierName = line.replace(/^(applier name|applicant name)[-:\s]+/i, '').trim();
+    // Check for fields using regular expressions for maximum flexibility
+    const cityMatch = line.match(/^(?:city|village|vill)(?:age)?[-:\s]*(.*)/i) || (lowerLine.includes('bajrang mohalla') ? [line, line] : null);
+    const tehsilMatch = line.match(/(?:tehsil|tahsil)[-:\s]*(.*)/i);
+    const distMatch = line.match(/(?:district|distt|dist)[-:\s]*(.*)/i);
+    const pinMatch = line.match(/(?:pincode|pin\s*code|pin)[-:\s]*(.*)/i);
+    const stateMatch = line.match(/(?:state)[-:\s]*(.*)/i);
+    const mobileMatch = line.match(/(?:m\.?\s*no\.?|mob(?:ile)?(?:\s*no\.?)?(?:\s*number)?|contact|phone|ph)[-:\s]+(.*)/i) || line.match(/^(?:m\.?\s*no\.?|mob(?:ile)?(?:\s*no\.?)?(?:\s*number)?|contact|phone|ph)\s*(.*)/i);
+    const applierMatch = line.match(/(?:applier\s*name|applicant\s*name|applier|applicant)[-:\s]*(.*)/i);
+
+    if (cityMatch) {
+      cityVillage = cityMatch[1].trim();
+    } else if (tehsilMatch) {
+      tehsil = tehsilMatch[1].trim();
+    } else if (distMatch) {
+      district = distMatch[1].trim();
+    } else if (pinMatch) {
+      pincode = pinMatch[1].trim();
+    } else if (stateMatch) {
+      state = stateMatch[1].trim();
+    } else if (mobileMatch) {
+      mobile = mobileMatch[1].trim();
+    } else if (applierMatch) {
+      applierName = applierMatch[1].trim();
     }
   }
 
@@ -100,7 +123,8 @@ const formatText = (inputText) => {
     }
   }
   if (cityVillage) {
-    firstLineParts.push(`VILL - ${cityVillage.toUpperCase()}`);
+    let displayCity = cityVillage.toUpperCase();
+    firstLineParts.push(`VILL - ${displayCity}`);
   }
   if (tehsil) {
     firstLineParts.push(`TEHSIL - ${tehsil.toUpperCase()}`);
@@ -116,6 +140,37 @@ const formatText = (inputText) => {
   const thirdLine = `APPLIER NAME - ${formattedApplier}${tag ? ` (${tag})` : ''}`;
 
   return `${firstLine}\n${secondLine}\n${thirdLine}`;
+};
+
+const formatText = (inputText) => {
+  let rawBlocks = [];
+  if (inputText.includes("---") || inputText.includes("===")) {
+    rawBlocks = inputText.split(/\n\s*(?:---+|===+)\s*\n/);
+  } else {
+    const lines = inputText.split("\n");
+    let currentBlock = [];
+    for (let line of lines) {
+      const trimmed = line.trim();
+      const upperTrimmed = trimmed.toUpperCase();
+      if ((upperTrimmed.startsWith("HTL") || upperTrimmed.startsWith("NETWORK")) && currentBlock.length > 0) {
+        rawBlocks.push(currentBlock.join("\n"));
+        currentBlock = [];
+      }
+      currentBlock.push(line);
+    }
+    if (currentBlock.length > 0) {
+      rawBlocks.push(currentBlock.join("\n"));
+    }
+  }
+
+  rawBlocks = rawBlocks.map(b => b.trim()).filter(Boolean);
+
+  const outputs = rawBlocks.map(block => {
+    const formatted = formatSingleBlock(block);
+    return `${block}\n--------------------\n${formatted}`;
+  });
+
+  return outputs.join("\n\n====================\n\n");
 };
 
 console.log(formatText(inputText));

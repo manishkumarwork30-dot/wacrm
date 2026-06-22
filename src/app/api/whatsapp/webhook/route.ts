@@ -186,19 +186,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  // Process webhook in the background without blocking response
-  const reqWithWait = request as any
-  if (typeof reqWithWait.waitUntil === 'function') {
-    reqWithWait.waitUntil(
-      processWebhook(body).catch((error) => {
-        console.error('Error in background processWebhook:', error)
-      })
-    )
-  } else {
-    // Fallback if waitUntil is not present (e.g. some local environments)
-    processWebhook(body).catch((error) => {
-      console.error('Error in unawaited processWebhook:', error)
-    })
+  // Process webhook and wait for it to complete to prevent serverless environments from freezing the execution context.
+  try {
+    await processWebhook(body)
+  } catch (error) {
+    console.error('Error in processWebhook:', error)
   }
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
@@ -234,14 +226,8 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
         .eq('phone_number_id', phoneNumberId)
 
       if (configError) {
-        console.error(
-          'Error fetching whatsapp_config for phone_number_id:',
-          phoneNumberId,
-          configError
-        )
-        continue
+        console.warn('⚠️ Error fetching whatsapp_config for phone_number_id:', phoneNumberId, configError)
       }
-
       if (!configRows || configRows.length === 0) {
         console.error('No config found for phone_number_id:', phoneNumberId)
         continue

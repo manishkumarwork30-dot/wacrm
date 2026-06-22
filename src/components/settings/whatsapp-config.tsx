@@ -99,6 +99,9 @@ export function WhatsAppConfig() {
             setConnectionStatus('connected');
             setResetReason(null);
             setStatusMessage('');
+            if (payload.verify_token) {
+              setVerifyToken(payload.verify_token);
+            }
           } else {
             setConnectionStatus('disconnected');
             setResetReason(payload.needs_reset ? 'token_corrupted' : payload.reason === 'meta_api_error' ? 'meta_api_error' : null);

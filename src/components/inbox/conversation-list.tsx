@@ -78,6 +78,7 @@ export function ConversationList({
       const { data, error } = await supabase
         .from("conversations")
         .select("*, contact:contacts(*)")
+        .order("unread_count", { ascending: false })
         .order("last_message_at", { ascending: false });
 
       if (cancelled) return;

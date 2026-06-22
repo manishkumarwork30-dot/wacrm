@@ -48,7 +48,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, access_token, status')
+      .select('phone_number_id, access_token, status, verify_token')
       .eq('user_id', user.id)
       .maybeSingle()
 
@@ -96,7 +96,21 @@ export async function GET() {
         phoneNumberId: config.phone_number_id,
         accessToken,
       })
-      return NextResponse.json({ connected: true, phone_info: phoneInfo })
+      
+      let decryptedVerifyToken: string | null = null
+      if (config.verify_token) {
+        try {
+          decryptedVerifyToken = decrypt(config.verify_token)
+        } catch {
+          // ignore decryption failure
+        }
+      }
+
+      return NextResponse.json({
+        connected: true,
+        phone_info: phoneInfo,
+        verify_token: decryptedVerifyToken,
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown Meta API error'
       console.error('[whatsapp/config GET] Meta API verification failed:', message)
@@ -193,12 +207,23 @@ export async function POST(request: Request) {
       )
     }
 
+    // Upsert — overwrite any existing (possibly corrupted) config
+    const { data: existing } = await supabaseAdmin()
+      .from('whatsapp_config')
+      .select('id, verify_token')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
     // Encrypt sensitive tokens before storing
     let encryptedAccessToken: string
-    let encryptedVerifyToken: string | null
+    let encryptedVerifyToken: string | null = null
     try {
       encryptedAccessToken = encrypt(access_token)
-      encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
+      if (verify_token !== undefined) {
+        encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
+      } else if (existing) {
+        encryptedVerifyToken = existing.verify_token
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown encryption error'
       console.error('Encryption failed:', message)
@@ -210,13 +235,6 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
-
-    // Upsert — overwrite any existing (possibly corrupted) config
-    const { data: existing } = await supabase
-      .from('whatsapp_config')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
 
     if (existing) {
       const { error: updateError } = await supabase
