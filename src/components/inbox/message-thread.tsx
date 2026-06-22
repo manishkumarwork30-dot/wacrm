@@ -364,8 +364,19 @@ export function MessageThread({
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          // Inserted message from webhook
-          onNewMessage(payload.new);
+          // Inserted message from webhook – map to Message type
+          const msg: Message = {
+            id: payload.new.id,
+            conversation_id: payload.new.conversation_id,
+            sender_type: payload.new.sender_type,
+            content_type: payload.new.content_type,
+            content_text: payload.new.content_text,
+            status: payload.new.status,
+            created_at: payload.new.created_at,
+            reply_to_message_id: payload.new.reply_to_message_id,
+            ...payload.new,
+          };
+          onNewMessage(msg);
         },
       )
       .on(

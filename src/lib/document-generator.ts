@@ -128,7 +128,7 @@ export const DEFAULT_DOC_CONFIG = {
   paragraph2: `You need to deposit Agreement fee of Rs.2550/-in our ADVOCATE Bank account through NEFT/RTGS/IMPS/TRANSFER. That will be refunded to you along with your first payment given by the company with 2% interest on it.`,
   paragraph3: `You should fulfill the minimum requirement of land referred by you for installation of tower that is 225 sq.ft land must be owned by the applicant and lease land will not be considered.`,
   paragraph4: `Once the deal begins and the tower gets installed on your land, the scheme cannot be terminated before maturity period of 20 years. Delay may terminate the deal and the whole issue gets condemned.`,
-  
+
   advanceAmount: 'Rs. 70 lacs',
   monthlyRent: 'Rs.60,000/-',
   guardSalary: 'Rs. 22000/-',
@@ -136,10 +136,10 @@ export const DEFAULT_DOC_CONFIG = {
   interestRate: '2%',
   agreementPeriod: '20 years',
   incrementPercent: '10%',
-  
+
   surveyLocationId: 'LOCATION - ID - VI / 5G 0001',
   surveyReportText: 'THE SURVEY DEPARTMENT OF INDIA CONDUCTED SURVEY FOR THE TOWER INSTALLATION SURVEY REPORT IS POSITIVE WITH THE LAND PROPOSED BY YOU NOW VI 5G NETWORK HAS BEEN ALLOWED FOR FURTHER PROCESS NOW VI 5G NETWORK IS ALLOWED TO INSTALL TOWER AT GIVEN ABOVE ADDRESS THE SURVEY REPORT IS LIMITED AND CONFIDENTIAL.',
-  
+
   logoUrl: 'https://htlnetwork.com/assets/images/logo.png',
   qrUrl: 'https://i.ibb.co/Hfydd1wF/qrcode-361081771-9939f3ef116f18267f831b63d7b2e76d.png',
   signatureUrl: 'https://i.ibb.co/Fqj8CGm3/signature.png',
@@ -156,7 +156,7 @@ export const DEFAULT_DOC_CONFIG = {
 export async function getAssetsWithOverrides(customConfig?: any) {
   const defaults = await getAssets();
   if (!customConfig) return defaults;
-  
+
   const overrides: any = { ...defaults };
   const keys = [
     ['logo', 'logoUrl'],
@@ -171,7 +171,7 @@ export async function getAssetsWithOverrides(customConfig?: any) {
     ['p4img1', 'p4img1Url'],
     ['p4img2', 'p4img2Url'],
   ];
-  
+
   await Promise.all(
     keys.map(async ([assetKey, configKey]) => {
       const url = customConfig[configKey];
@@ -183,7 +183,7 @@ export async function getAssetsWithOverrides(customConfig?: any) {
       }
     })
   );
-  
+
   return overrides;
 }
 
@@ -249,7 +249,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.save();
       doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
       doc.font(B).fontSize(72).text('HTL NETWORK', 170, headerBoxY + 12, { // large font size matching logo height
-        width: 380,
+        width: 340,
         align: 'left',
         characterSpacing: 0
       });
@@ -260,18 +260,18 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       doc.x = 40;
       doc.y = 99; // Reduced gap below the divider line
-      
+
       // APPROVAL LETTER title centered below header
       doc.save();
       doc.font(B).fontSize(14).fillColor('#0026e6')
         .text('APPROVAL LETTER', { align: 'center' });
-      
+
       // Underline style (red line closer to APPROVAL LETTER text)
       const titleWidth = doc.widthOfString('APPROVAL LETTER');
       const startX = (595.28 - titleWidth) / 2;
       doc.moveTo(startX, doc.y + 1).lineTo(startX + titleWidth, doc.y + 1).strokeColor('red').lineWidth(2.5).stroke();
       doc.restore();
-      
+
       doc.moveDown(0.7);
 
       // Date
@@ -338,48 +338,38 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formatParagraph(cfg.paragraph2, pVars),
         40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
       );
-      doc.moveDown(1.0);
-      doc.text(
-        formatParagraph(cfg.paragraph3, pVars),
-        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
-      );
-      doc.moveDown(1.0);
-      doc.text(
-        formatParagraph(cfg.paragraph4, pVars),
-        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
-      );
-
+      
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
       const signY = 620;
-
-      // 1. Signature on left
-      doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', 40, signY);
+      const leftX = 40;
+      const rightX = 300;
+      // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
+      doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', leftX, signY);
       if (assets.signature) {
-        try { doc.image(assets.signature, 40, signY + 15, { width: 90, height: 40 }); }
-        catch { _drawFallbackSignature(doc, 40, signY + 15); }
+        try { doc.image(assets.signature, leftX, signY + 15, { width: 90, height: 40 }); }
+        catch { _drawFallbackSignature(doc, leftX, signY + 15); }
       } else {
-        _drawFallbackSignature(doc, 40, signY + 15);
+        _drawFallbackSignature(doc, leftX, signY + 15);
       }
-
-      // 2. Stamp in the middle-left (moved so it doesn't overlap signature vertically)
+      // Approval stamp below signature
       if (assets.stamp) {
-        try { doc.image(assets.stamp, 200, signY - 10, { width: 80, height: 80 }); }
-        catch { _drawFallbackStamp(doc, 200, signY - 10); }
+        try { doc.image(assets.stamp, leftX, signY + 60, { width: 80, height: 80 }); }
+        catch { _drawFallbackStamp(doc, leftX, signY + 60); }
       } else {
-        _drawFallbackStamp(doc, 200, signY - 10);
+        _drawFallbackStamp(doc, leftX, signY + 60);
       }
-
-      // 3. QR code on the right
-      const qrX = 420;
-      if (assets.qr) {
-        try { doc.image(assets.qr, qrX, signY - 10, { width: 80, height: 80 }); }
-        catch { _drawFallbackQR(doc, qrX, signY - 10); }
-      } else {
-        _drawFallbackQR(doc, qrX, signY - 10);
-      }
+      // Right column: QR prompt text and QR image stacked vertically
+      // QR prompt text
       doc.font(B).fontSize(7.5).fillColor('black')
-        .text('Please scan the bar code and check Approval', qrX - 10, signY + 75, { width: 100, align: 'center' });
+        .text('Please scan QR code', rightX, signY);
+      // QR image below text
+      if (assets.qr) {
+        try { doc.image(assets.qr, rightX, signY + 15, { width: 80, height: 80 }); }
+        catch { _drawFallbackQR(doc, rightX, signY + 15); }
+      } else {
+        _drawFallbackQR(doc, rightX, signY + 15);
+      }
 
       // Footer
       doc.save();

@@ -1,6 +1,6 @@
 // src/bin/format-whatsapp.ts
 
-#!/usr/bin/env node
+
 import { formatWhatsAppText, formatEntry } from '../lib/whatsapp/messageFormatter';
 import * as fs from 'fs';
 import * as path from 'path';

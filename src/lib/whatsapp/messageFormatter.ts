@@ -15,28 +15,85 @@ export interface FormattedEntry {
   phone?: string;
   applicantName?: string;
   stateCode?: string; // two‑letter code like "PR", "RJ"
+  stateAbbr?: string; // derived abbreviation (UP, MP, ...)
 }
 
 /**
- * Parses a raw multiline string copied from WhatsApp into an array of
- * {@link FormattedEntry}. It tolerates:
+ * Mapping of full state names to their two‑letter abbreviations.
+ */
+const STATE_ABBR_MAP: Record<string, string> = {
+  "Uttar Pradesh": "UP",
+  "Madhya Pradesh": "MP",
+  "Rajasthan": "RJ",
+  "Punjab": "PB",
+  "Gujarat": "GJ",
+  "Haryana": "HR",
+  "Delhi": "DL",
+  "Karnataka": "KA",
+  "Maharashtra": "MH",
+  "Bihar": "BR",
+  // add more as needed
+};
+
+/**
+ * Normalized label map – maps various label spellings to a canonical key.
+ */
+const LABEL_MAP: Record<string, keyof FormattedEntry> = {
+  "name": "name",
+  "village": "village",
+  "post office": "postOffice",
+  "postoffice": "postOffice",
+  "post-office": "postOffice",
+  "tehsil": "tehsil",
+  "district": "district",
+  "distt": "district",
+  "dist": "district",
+  "disst": "district",
+  "pin code": "pincode",
+  "pincode": "pincode",
+  "pin": "pincode",
+  "state": "state",
+  "m.no": "phone",
+  "mobile": "phone",
+  "mobile no": "phone",
+  "applier": "applicantName",
+  "applicant": "applicantName",
+};
+
+/**
+ * Helper to get the canonical key for a raw label string.
+ */
+function getCanonicalKey(raw: string): keyof FormattedEntry | null {
+  const lowered = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  for (const label in LABEL_MAP) {
+    const pattern = new RegExp(`^${label}$`, "i");
+    if (pattern.test(lowered)) {
+      return LABEL_MAP[label];
+    }
+  }
+  return null;
+}
+
+/**
+ * Parses a raw multiline string copied from WhatsApp into an array of FormattedEntry.
+ * It tolerates:
  *   • Timestamp lines that start with "[".
  *   • Sender lines that begin with a phone number.
  *   • Inconsistent label spellings (e.g. "Disst", "Distt").
- *   • Optional two‑letter state‑code lines (e.g. PR, RN) that act as a
- *     delimiter for the *next* entry.
+ *   • Optional two‑letter state‑code lines (e.g. PR, RN) that act as a delimiter for the *next* entry.
  */
 export function formatWhatsAppText(rawText: string): FormattedEntry[] {
-  // 1️⃣ Strip out timestamp lines, HTL Network lines and lines that start with a phone number
+  // 1️⃣ Strip out timestamp lines, HTL Network lines and lines that start with a phone number or numbering.
   const cleaned = rawText
     .split(/\r?\n/)
     .filter(
       line =>
-        !line.trim().startsWith('[') && // timestamps like "[5:00 pm, 18/6/2026]"
-        !/^\+?\d{1,3}\s*\d{5,}/.test(line.trim()) && // lines that are just a phone number prefix
-        !/HTL\s+Network/i.test(line) // ignore footer lines
+        !line.trim().startsWith("[") && // timestamps like "[5:00 pm, 18/6/2026]"
+        !/^\+?\d{1,3}\s*\d{5,}/.test(line.trim()) && // phone number prefix lines
+        !/HTL\s+Network/i.test(line) && // ignore footer lines
+        !/^\d+\./.test(line.trim()) // ignore numbering like "1.", "2."
     )
-    .join('\n');
+    .join("\n");
 
   // 2️⃣ Split on blank lines – each block should represent one person's data (or a lone state code)
   const rawBlocks = cleaned
@@ -56,7 +113,7 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
       continue;
     }
 
-    const entry: FormattedEntry = { name: '' };
+    const entry: FormattedEntry = { name: "" };
 
     for (const line of lines) {
       // 3️⃣ Detect combined name + relation (e.g. "Kallu S/O Baburam")
@@ -67,105 +124,111 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
         continue;
       }
 
-      // 4️⃣ Split on first ':' if present; otherwise split on the first '-' while preserving the dash in the value
-      let key: string;
-      let value: string;
-      if (line.includes(':')) {
-        const [keyRaw, ...rest] = line.split(':');
-        key = keyRaw.trim().toLowerCase();
-        value = rest.join(':').trim();
-      } else if (line.includes('-')) {
-        const idx = line.indexOf('-');
-        const keyRaw = line.slice(0, idx);
-        key = keyRaw.trim().toLowerCase();
-        value = line.slice(idx + 1).trim(); // keep any dash inside the value
-      } else {
-        continue; // unrecognizable line
-      }
-      if (!value) continue;
-
-      // 5️⃣ Map the key to the appropriate field (fuzzy matching)
-      if ((/^|\s)name$/i.test(key) && !entry.name) {
-        entry.name = value;
-      } else if (/(s\/o|w\/o|spouse|son|daughter)/i.test(key)) {
-        entry.relation = value;
-      } else if (/village/.test(key)) {
-        entry.village = value;
-      } else if (/post\s*office/.test(key)) {
-        entry.postOffice = value;
-      } else if (/tehsil/.test(key)) {
-        entry.tehsil = value;
-      } else if (/distt?|district/.test(key)) {
-        // Preserve the raw district/value exactly as provided
-        entry.district = value.replace(/[\-_]/g, ' ');
-      } else if (/pin.?code/.test(key)) {
-        entry.pincode = value;
-      } else if (/state/.test(key)) {
-        entry.state = value;
-      } else if (/m\\.?no|mobile/.test(key)) {
-        entry.phone = value.replace(/[^\d+]/g, '');
-      } else if (/applier|applicant/.test(key)) {
-        entry.applicantName = value;
+      // 4️⃣ Flexible parsing for lines that may contain multiple concatenated labels.
+      //    Split on hyphens and colons, then walk tokens.
+      const tokens = line.split(/[-:]/).map(t => t.trim()).filter(Boolean);
+      let pendingKey: keyof FormattedEntry | null = null;
+      for (const token of tokens) {
+        if (pendingKey) {
+          assignValue(entry, pendingKey, token);
+          pendingKey = null;
+          continue;
+        }
+        const canonical = getCanonicalKey(token);
+        if (canonical) {
+          pendingKey = canonical;
+        } else {
+          // token didn't match any known label – could be a stray value; ignore.
+        }
       }
     }
 
-    // If we captured a pending state code, assign it now
+    // Assign any pending state code captured earlier.
     if (pendingStateCode && !entry.stateCode) {
       entry.stateCode = pendingStateCode;
       pendingStateCode = null;
     }
 
-    // Fallback: if we still have no name and the block has more than one line, use the first line as a guess
+    // Derive state abbreviation from full state name if present.
+    if (entry.state && !entry.stateAbbr) {
+      const abbr = STATE_ABBR_MAP[entry.state.trim()];
+      if (abbr) entry.stateAbbr = abbr;
+    }
+
+    // Fallback: if name still empty but we have multiple lines, use first line.
     if (!entry.name && lines.length > 1) {
       entry.name = lines[0];
     }
 
-    // Only keep entries that have at least one meaningful field
     const hasData = entry.stateCode || entry.name || entry.relation || entry.village || entry.postOffice || entry.tehsil || entry.district || entry.pincode || entry.state || entry.phone || entry.applicantName;
-    if (hasData) {
-      result.push(entry);
-    }
+    if (hasData) result.push(entry);
   }
 
   return result;
 }
 
 /**
- * Formats a {@link FormattedEntry} into the user‑requested single‑line style.
- * Example output:
- *   MR. VEER BHAN SINGH S/O MR. OMPRAKASH, VILL - RURIYA, POST OFFICE - ..., DISTT - MAINPURI (UP) - 205130
- *   MOBILE NO - 9993192017
- *   APPLICANT NAME - MR. OMPRAKASH (NH)
+ * Assigns a value to the appropriate field on the entry based on the canonical key.
  */
-export function formatEntry(entry: FormattedEntry): string {
-  const lines: string[] = [];
-
-  // Name + relation line (single line)
-  const namePart = entry.name.trim();
-  const relationPart = entry.relation ? ` ${entry.relation.trim()}` : '';
-  let firstLine = `${namePart}${relationPart}`.trim();
-
-  // Append location fields separated by commas
-  const locParts: string[] = [];
-  if (entry.village) locParts.push(`VILL - ${entry.village}`);
-  if (entry.postOffice) locParts.push(`POST OFFICE - ${entry.postOffice}`);
-  if (entry.tehsil) locParts.push(`TEHSIL - ${entry.tehsil}`);
-  if (entry.district) locParts.push(`DISTT - ${entry.district}`);
-  if (entry.pincode) locParts.push(`PINCODE - ${entry.pincode}`);
-  if (entry.state) locParts.push(`STATE - ${entry.state}`);
-  if (locParts.length) firstLine = `${firstLine}, ${locParts.join(', ')}`;
-  lines.push(firstLine);
-
-  // Mobile line
-  if (entry.phone) lines.push(`MOBILE NO - ${entry.phone}`);
-
-  // Applicant line with optional state code in parentheses
-  if (entry.applicantName) {
-    const codePart = entry.stateCode ? ` (${entry.stateCode})` : '';
-    lines.push(`APPLICANT NAME - ${entry.applicantName}${codePart}`);
+function assignValue(entry: FormattedEntry, key: keyof FormattedEntry, rawValue: string) {
+  const value = rawValue.trim();
+  if (!value) return;
+  switch (key) {
+    case "name":
+      if (!entry.name) entry.name = value;
+      break;
+    case "relation":
+      entry.relation = value;
+      break;
+    case "village":
+      entry.village = value;
+      break;
+    case "postOffice":
+      entry.postOffice = value;
+      break;
+    case "tehsil":
+      entry.tehsil = value;
+      break;
+    case "district":
+      entry.district = value.replace(/[\-_]/g, " ");
+      break;
+    case "pincode":
+      entry.pincode = value;
+      break;
+    case "state":
+      entry.state = value;
+      break;
+    case "phone":
+      entry.phone = value.replace(/[^\d+]/g, "");
+      break;
+    case "applicantName":
+      entry.applicantName = value;
+      break;
+    default:
+      break;
   }
-
-  return lines.join('\n');
 }
 
-export { formatWhatsAppText, formatEntry };
+/**
+ * Formats a FormattedEntry into the user‑requested single‑line style.
+ * Example output:
+ *   MR. VEER BHAN SINGH S/O MR. OMPRAKASH, VILL - RURIYA, TEHSIL - GHIROR, DISTT - MAINPURI (UP) - 205130
+ *   MOBILE NO - 9993192017
+ *   APPLICANT NAME - MR. OMPRAKASH (RJ)
+ */
+export function formatEntry(entry: FormattedEntry): string {
+  const name = entry.name ? entry.name.toUpperCase() : "";
+  const relation = entry.relation ? ` ${entry.relation.toUpperCase()}` : "";
+  const village = entry.village ? `, VILL - ${entry.village.toUpperCase()}` : "";
+  const postOffice = entry.postOffice ? `, POST - ${entry.postOffice.toUpperCase()}` : "";
+  const tehsil = entry.tehsil ? `, TEHSIL - ${entry.tehsil.toUpperCase()}` : "";
+  const district = entry.district ? `, DISTT - ${entry.district.toUpperCase()}` : "";
+  const state = entry.stateAbbr ? ` (${entry.stateAbbr.toUpperCase()})` : (entry.state ? ` (${entry.state.toUpperCase()})` : "");
+  const pincode = entry.pincode ? ` - ${entry.pincode}` : "";
+  const phone = entry.phone ? `\nMOBILE NO - ${entry.phone}` : "";
+  const applier = entry.applicantName 
+    ? `\nAPPLICANT NAME - ${entry.applicantName.toUpperCase()}${entry.stateCode ? ` (${entry.stateCode.toUpperCase()})` : ""}` 
+    : "";
+
+  return `${name}${relation}${village}${postOffice}${tehsil}${district}${state}${pincode}${phone}${applier}`;
+}
