@@ -23,16 +23,18 @@ export interface FormattedEntry {
  *   • Timestamp lines that start with "[".
  *   • Sender lines that begin with a phone number.
  *   • Inconsistent label spellings (e.g. "Disst", "Distt").
- *   • Optional two‑letter state‑code lines (e.g. PR, RN).
+ *   • Optional two‑letter state‑code lines (e.g. PR, RN) that act as a
+ *     delimiter for the *next* entry.
  */
 export function formatWhatsAppText(rawText: string): FormattedEntry[] {
-  // 1️⃣ Strip out timestamp lines and lines that start with a phone number
+  // 1️⃣ Strip out timestamp lines, HTL Network lines and lines that start with a phone number
   const cleaned = rawText
     .split(/\r?\n/)
     .filter(
       line =>
         !line.trim().startsWith('[') && // timestamps like "[5:00 pm, 18/6/2026]"
-        !/^\+?\d{1,3}\s*\d{5,}/.test(line.trim()) // lines that are just a phone number prefix
+        !/^\+?\d{1,3}\s*\d{5,}/.test(line.trim()) && // lines that are just a phone number prefix
+        !/HTL\s+Network/i.test(line) // ignore footer lines
     )
     .join('\n');
 
@@ -43,16 +45,14 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
     .filter(Boolean);
 
   const result: FormattedEntry[] = [];
-  let previousEntry: FormattedEntry | null = null;
+  let pendingStateCode: string | null = null;
 
   for (const block of rawBlocks) {
     const lines = block.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-    // If the block is just a two‑letter state code, attach it to the previous entry
+    // If the block is just a two‑letter state code, remember it for the next entry
     if (lines.length === 1 && /^[A-Z]{2}$/.test(lines[0])) {
-      if (previousEntry) {
-        previousEntry.stateCode = lines[0];
-      }
+      pendingStateCode = lines[0];
       continue;
     }
 
@@ -85,7 +85,7 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
       if (!value) continue;
 
       // 5️⃣ Map the key to the appropriate field (fuzzy matching)
-      if (/(^|\s)name$/i.test(key) && !entry.name) {
+      if ((/^|\s)name$/i.test(key) && !entry.name) {
         entry.name = value;
       } else if (/(s\/o|w\/o|spouse|son|daughter)/i.test(key)) {
         entry.relation = value;
@@ -95,17 +95,24 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
         entry.postOffice = value;
       } else if (/tehsil/.test(key)) {
         entry.tehsil = value;
-      } else if (/dist|district/.test(key)) {
+      } else if (/distt?|district/.test(key)) {
+        // Preserve the raw district/value exactly as provided
         entry.district = value.replace(/[\-_]/g, ' ');
       } else if (/pin.?code/.test(key)) {
         entry.pincode = value;
       } else if (/state/.test(key)) {
         entry.state = value;
-      } else if (/m\.?no|mobile/.test(key)) {
+      } else if (/m\\.?no|mobile/.test(key)) {
         entry.phone = value.replace(/[^\d+]/g, '');
       } else if (/applier|applicant/.test(key)) {
         entry.applicantName = value;
       }
+    }
+
+    // If we captured a pending state code, assign it now
+    if (pendingStateCode && !entry.stateCode) {
+      entry.stateCode = pendingStateCode;
+      pendingStateCode = null;
     }
 
     // Fallback: if we still have no name and the block has more than one line, use the first line as a guess
@@ -117,9 +124,48 @@ export function formatWhatsAppText(rawText: string): FormattedEntry[] {
     const hasData = entry.stateCode || entry.name || entry.relation || entry.village || entry.postOffice || entry.tehsil || entry.district || entry.pincode || entry.state || entry.phone || entry.applicantName;
     if (hasData) {
       result.push(entry);
-      previousEntry = entry;
     }
   }
 
   return result;
 }
+
+/**
+ * Formats a {@link FormattedEntry} into the user‑requested single‑line style.
+ * Example output:
+ *   MR. VEER BHAN SINGH S/O MR. OMPRAKASH, VILL - RURIYA, POST OFFICE - ..., DISTT - MAINPURI (UP) - 205130
+ *   MOBILE NO - 9993192017
+ *   APPLICANT NAME - MR. OMPRAKASH (NH)
+ */
+export function formatEntry(entry: FormattedEntry): string {
+  const lines: string[] = [];
+
+  // Name + relation line (single line)
+  const namePart = entry.name.trim();
+  const relationPart = entry.relation ? ` ${entry.relation.trim()}` : '';
+  let firstLine = `${namePart}${relationPart}`.trim();
+
+  // Append location fields separated by commas
+  const locParts: string[] = [];
+  if (entry.village) locParts.push(`VILL - ${entry.village}`);
+  if (entry.postOffice) locParts.push(`POST OFFICE - ${entry.postOffice}`);
+  if (entry.tehsil) locParts.push(`TEHSIL - ${entry.tehsil}`);
+  if (entry.district) locParts.push(`DISTT - ${entry.district}`);
+  if (entry.pincode) locParts.push(`PINCODE - ${entry.pincode}`);
+  if (entry.state) locParts.push(`STATE - ${entry.state}`);
+  if (locParts.length) firstLine = `${firstLine}, ${locParts.join(', ')}`;
+  lines.push(firstLine);
+
+  // Mobile line
+  if (entry.phone) lines.push(`MOBILE NO - ${entry.phone}`);
+
+  // Applicant line with optional state code in parentheses
+  if (entry.applicantName) {
+    const codePart = entry.stateCode ? ` (${entry.stateCode})` : '';
+    lines.push(`APPLICANT NAME - ${entry.applicantName}${codePart}`);
+  }
+
+  return lines.join('\n');
+}
+
+export { formatWhatsAppText, formatEntry };
