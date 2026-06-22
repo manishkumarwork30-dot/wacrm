@@ -248,7 +248,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Title Text side-by-side (fontSize 72 for ~100px height. Width set to 380 so it fits side-by-side without wrapping)
       doc.save();
       doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(72).text('HTL NETWORK', 170, headerBoxY + 12, { // large font size matching logo height
+      doc.font(B).fontSize(64).text('HTL NETWORK', 170, headerBoxY + 12, { // large font size matching logo height
         width: 340,
         align: 'left',
         characterSpacing: 0
@@ -256,14 +256,14 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.restore();
 
       // Bold blue divider line matching the mockup layout (closer to header content)
-      doc.moveTo(40, 95).lineTo(555, 95).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
+      doc.moveTo(40, 120).lineTo(555, 95).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
 
       doc.x = 40;
       doc.y = 99; // Reduced gap below the divider line
 
       // APPROVAL LETTER title centered below header
       doc.save();
-      doc.font(B).fontSize(14).fillColor('#0026e6')
+      doc.font(B).fontSize(18).fillColor('#0026e6')
         .text('APPROVAL LETTER', { align: 'center' });
 
       // Underline style (red line closer to APPROVAL LETTER text)
@@ -296,14 +296,14 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 40, doc.y);
+      doc.font(R).fontSize(12).fillColor('black').text(`Date : ${formattedDate}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(10).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
+      doc.font(B).fontSize(18).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
       doc.moveDown(0.8);
-      doc.font(B).fontSize(11).text(`Mr. ${finalName}`, 40, doc.y);
-      doc.font(B).fontSize(11).text(`District-${finalLocation}`, 40, doc.y);
+      doc.font(B).fontSize(18).text(`Mr. ${finalName}`, 40, doc.y);
+      doc.font(B).fontSize(18).text(`District-${finalLocation}`, 40, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map
@@ -328,24 +328,24 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       };
 
       // Body paragraphs
-      doc.font(R).fontSize(9.5).fillColor('black');
+      doc.font(R).fontSize(12).fillColor('black');
       doc.text(
         formatParagraph(cfg.paragraph1, pVars),
-        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
+        40, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         formatParagraph(cfg.paragraph2, pVars),
-        40, doc.y, { align: 'justify', lineGap: 2.2, width: 515 }
+        40, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
-      
+
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
-      const signY = 620;
+      const signY = 560;
       const leftX = 40;
       const rightX = 300;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
-      doc.font(B).fontSize(10).fillColor('black').text('Authorized Signatory', leftX, signY);
+      doc.font(B).fontSize(12).fillColor('black').text('Authorized Signatory', leftX, signY);
       if (assets.signature) {
         try { doc.image(assets.signature, leftX, signY + 15, { width: 90, height: 40 }); }
         catch { _drawFallbackSignature(doc, leftX, signY + 15); }
@@ -361,11 +361,11 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       }
       // Right column: QR prompt text and QR image stacked vertically
       // QR prompt text
-      doc.font(B).fontSize(7.5).fillColor('black')
+      doc.font(B).fontSize(12).fillColor('black')
         .text('Please scan QR code', rightX, signY);
       // QR image below text
       if (assets.qr) {
-        try { doc.image(assets.qr, rightX, signY + 15, { width: 80, height: 80 }); }
+        try { doc.image(assets.qr, rightX, signY + 15, { width: 100, height: 100 }); }
         catch { _drawFallbackQR(doc, rightX, signY + 15); }
       } else {
         _drawFallbackQR(doc, rightX, signY + 15);
@@ -373,8 +373,8 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Footer
       doc.save();
-      doc.moveTo(40, 740).lineTo(555, 740).strokeColor('black').lineWidth(1.5).stroke();
-      doc.font(B).fontSize(8).fillColor('black').text(
+      doc.moveTo(0, 740).lineTo(595, 740).strokeColor('black').lineWidth(1.5).stroke();
+      doc.font(B).fontSize(22).fillColor('black').text(
         cfg.companyAddress,
         40, 748, { align: 'center', width: 515 }
       );
