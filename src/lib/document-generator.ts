@@ -247,7 +247,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Title Text side-by-side with specified CSS styles
       doc.save();
-      doc.fillColor('#0202c2ff');
+      doc.fillColor('#0000ffff');
       doc.font('Helvetica').fontSize(64).text('HTL NETWORK', 115, headerBoxY + 15, {
         width: 600,
         height: 200,
