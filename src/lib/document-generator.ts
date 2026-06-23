@@ -237,22 +237,22 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       const headerBoxY = 10;
       if (assets.logo) {
         try {
-          doc.image(assets.logo, 10, headerBoxY, { width: 130, height: 70 }); // logo height scaled to 100
+          doc.image(assets.logo, 6, headerBoxY, { width: 130, height: 70 }); // logo height scaled to 100
         } catch {
-          _drawFallbackTower(doc, 10, headerBoxY);
+          _drawFallbackTower(doc, 6, headerBoxY);
         }
       } else {
-        _drawFallbackTower(doc, 10, headerBoxY);
+        _drawFallbackTower(doc, 6, headerBoxY);
       }
 
-      // Title Text side-by-side (fontSize 72 for ~100px height. Width set to 380 so it fits side-by-side without wrapping)
+      // Title Text side-by-side with specified CSS styles
       doc.save();
-      doc.fillColor('#0000ff'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(60).text('HTL NETWORK', 110, headerBoxY + 15, { // large font size matching logo height
-        width: 500,
-        height: 160,
+      doc.fillColor('#0000FF'); 
+      doc.font('Helvetica').fontSize(140).text('HTL NETWORK', 115, headerBoxY + 15, { 
+        width: 800,
+        height: 200,
         align: 'left',
-        characterSpacing: 0
+        characterSpacing: 2
       });
       doc.restore();
 
@@ -260,7 +260,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.moveTo(0, 100).lineTo(660, 100).strokeColor('#0000FF').lineWidth(1.5).stroke();
 
       doc.x = 40;
-      doc.y = 120; // Reduced gap below the divider line
+      doc.y = 100; // Reduced gap below the divider line
 
       // APPROVAL LETTER title centered below header
       doc.save();
@@ -297,7 +297,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 110, doc.y);
+      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 60, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
@@ -342,11 +342,11 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
-      const signY = 560;
+      const signY = 600;
       const leftX = 60;
       const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
-      doc.font('Times-Bold').fontSize(14).fillColor('black').text('Authorized Signatory', leftX, signY);
+      doc.font('Times-Bold').fontSize(15).fillColor('black').text('Authorized Signatory', leftX, signY);
       if (assets.signature) {
         try { doc.image(assets.signature, leftX, signY + 40, { width: 100, height: 50 }); }
         catch { _drawFallbackSignature(doc, leftX, signY + 40); }
@@ -355,29 +355,29 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       }
       // Approval stamp below signature
       if (assets.stamp) {
-        try { doc.image(assets.stamp, leftX + 20, signY + 70, { width: 70, height: 70 }); }
-        catch { _drawFallbackStamp(doc, leftX + 20, signY + 70); }
+        try { doc.image(assets.stamp, leftX + 20, signY + 80, { width: 80, height: 80 }); }
+        catch { _drawFallbackStamp(doc, leftX + 20, signY + 80); }
       } else {
-        _drawFallbackStamp(doc, leftX + 20, signY + 70);
+        _drawFallbackStamp(doc, leftX + 20, signY + 80);
       }
       // Right column: QR prompt text and QR image stacked vertically
       // QR prompt text
       doc.font('Times-Bold').fontSize(12).fillColor('black')
-        .text('Please scan the bar code and check Approval', rightX - 60, signY);
+        .text('Please scan the bar code and check Approval', rightX - 120, signY);
       // QR image below text
       if (assets.qr) {
-        try { doc.image(assets.qr, rightX, signY + 50, { width: 120, height: 120 }); }
-        catch { _drawFallbackQR(doc, rightX, signY + 50); }
+        try { doc.image(assets.qr, rightX - 60, signY + 50, { width: 120, height: 120 }); }
+        catch { _drawFallbackQR(doc, rightX - 60, signY + 50); }
       } else {
-        _drawFallbackQR(doc, rightX, signY + 50);
+        _drawFallbackQR(doc, rightX - 60, signY + 50);
       }
 
       // Footer
       doc.save();
-      doc.moveTo(0, 740).lineTo(595, 740).strokeColor('black').lineWidth(1.5).stroke();
+      doc.moveTo(0, 750).lineTo(595, 750).strokeColor('black').lineWidth(1.5).stroke();
       doc.font(B).fontSize(13).fillColor('black').text(
         cfg.companyAddress,
-        0, 748, { align: 'center', width: 595 }
+        0, 755, { align: 'center', width: 595 }
       );
       doc.restore();
 
@@ -450,12 +450,12 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.font(R).fillColor('black').fontSize(9);
       [
         `Name: ${finalName}`,
-        `Mobile: ${mobile_no || 'N/A'}`,
+        // `Mobile: ${mobile_no || 'N/A'}`,
         `Location: ${finalLocation}`,
-        `State: ${finalState}`,
-        `Pincode: ${pin_code || 'N/A'}`,
+        // `State: ${finalState}`,
+        // `Pincode: ${pin_code || 'N/A'}`,
         `Land Size: ${finalLandSize}`,
-        `Ownership: ${finalOwnership}`,
+        `Ownership: ${finalName}`,
       ].forEach(line => { doc.text(line, 50, doc.y); doc.moveDown(0.4); });
 
       // ═══════════════════════════════════════════════════════════════════════
@@ -472,23 +472,23 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       if (assets.p3img1) {
         try {
-          doc.image(assets.p3img1, imgX, p3y, { width: 400, height: 400 });
+          doc.image(assets.p3img1, imgX, p3y, { width: 300, height: 300 });
         } catch {
-          _drawFallbackChart(doc, imgX, p3y, 400, 400, 'Signal Strength Graph (Simulation)', 'green');
+          _drawFallbackChart(doc, imgX, p3y, 300, 300, 'Signal Strength Graph (Simulation)', 'green');
         }
       } else {
-        _drawFallbackChart(doc, imgX, p3y, 400, 400, 'Signal Strength Graph (Simulation)', 'green');
+        _drawFallbackChart(doc, imgX, p3y, 300, 300, 'Signal Strength Graph (Simulation)', 'green');
       }
 
       const p3y2 = p3y + 415; // 400px image + 15px gap
       if (assets.p3img2) {
         try {
-          doc.image(assets.p3img2, imgX, p3y2, { width: 400, height: 400 });
+          doc.image(assets.p3img2, imgX, p3y2, { width: 300, height: 300 });
         } catch {
-          _drawFallbackChart(doc, imgX, p3y2, 400, 400, 'Frequency Analysis (Simulation)', 'blue');
+          _drawFallbackChart(doc, imgX, p3y2, 300, 300, 'Frequency Analysis (Simulation)', 'blue');
         }
       } else {
-        _drawFallbackChart(doc, imgX, p3y2, 400, 400, 'Frequency Analysis (Simulation)', 'blue');
+        _drawFallbackChart(doc, imgX, p3y2, 300, 300, 'Frequency Analysis (Simulation)', 'blue');
       }
 
       // ═══════════════════════════════════════════════════════════════════════
@@ -506,23 +506,23 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       if (assets.p4img1) {
         try {
-          doc.image(assets.p4img1, p4imgX, p4y, { width: 400, height: 400 });
+          doc.image(assets.p4img1, p4imgX, p4y, { width: 300, height: 300 });
         } catch {
-          _drawFallbackChart(doc, p4imgX, p4y, 400, 400, 'Network Coverage Spread - Part 1', 'green');
+          _drawFallbackChart(doc, p4imgX, p4y, 300, 300, 'Network Coverage Spread - Part 1', 'green');
         }
       } else {
-        _drawFallbackChart(doc, p4imgX, p4y, 400, 400, 'Network Coverage Spread - Part 1', 'green');
+        _drawFallbackChart(doc, p4imgX, p4y, 300, 300, 'Network Coverage Spread - Part 1', 'green');
       }
 
       const p4y2 = p4y + 415; // 400px image + 15px gap
       if (assets.p4img2) {
         try {
-          doc.image(assets.p4img2, p4imgX, p4y2, { width: 400, height: 400 });
+          doc.image(assets.p4img2, p4imgX, p4y2, { width: 300, height: 300 });
         } catch {
-          _drawFallbackChart(doc, p4imgX, p4y2, 400, 400, 'Network Coverage Spread - Part 2', 'blue');
+          _drawFallbackChart(doc, p4imgX, p4y2, 300, 300, 'Network Coverage Spread - Part 2', 'blue');
         }
       } else {
-        _drawFallbackChart(doc, p4imgX, p4y2, 400, 400, 'Network Coverage Spread - Part 2', 'blue');
+        _drawFallbackChart(doc, p4imgX, p4y2, 300, 300, 'Network Coverage Spread - Part 2', 'blue');
       }
 
       doc.end();
