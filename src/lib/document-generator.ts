@@ -234,36 +234,37 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       drawWatermark(doc, assets.watermark);
 
       // Logo Left & Company Title side-by-side (Header box)
-      const headerBoxY = 15;
+      const headerBoxY = 10;
       if (assets.logo) {
         try {
-          doc.image(assets.logo, 20, headerBoxY, { width: 130, height: 85 }); // logo height scaled to 100
+          doc.image(assets.logo, 10, headerBoxY, { width: 130, height: 70 }); // logo height scaled to 100
         } catch {
-          _drawFallbackTower(doc, 20, headerBoxY);
+          _drawFallbackTower(doc, 10, headerBoxY);
         }
       } else {
-        _drawFallbackTower(doc, 20, headerBoxY);
+        _drawFallbackTower(doc, 10, headerBoxY);
       }
 
       // Title Text side-by-side (fontSize 72 for ~100px height. Width set to 380 so it fits side-by-side without wrapping)
       doc.save();
-      doc.fillColor('#0026e6'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(60).text('HTL NETWORK', 120, headerBoxY + 12, { // large font size matching logo height
+      doc.fillColor('#0000ff'); // Bright/vibrant blue matching mockup
+      doc.font(B).fontSize(60).text('HTL NETWORK', 150, headerBoxY + 15, { // large font size matching logo height
         width: 500,
+        height: 100,
         align: 'left',
         characterSpacing: 0
       });
       doc.restore();
 
       // Bold blue divider line matching the mockup layout (closer to header content)
-      doc.moveTo(0, 115).lineTo(660, 115).strokeColor('#2b5ce6').lineWidth(2.5).stroke();
+      doc.moveTo(0, 115).lineTo(660, 115).strokeColor('#2b5ce6').lineWidth(1.5).stroke();
 
       doc.x = 40;
-      doc.y = 99; // Reduced gap below the divider line
+      doc.y = 120; // Reduced gap below the divider line
 
       // APPROVAL LETTER title centered below header
       doc.save();
-      doc.font(B).fontSize(18).fillColor('#0026e6')
+      doc.font(B).fontSize(18).fillColor('#0000FF')
         .text('APPROVAL LETTER', { align: 'center' });
 
       // Underline style (red line closer to APPROVAL LETTER text)
@@ -296,14 +297,14 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(13).fillColor('black').text(`Date : ${formattedDate}`, 40, doc.y);
+      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 110, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(14).text('DEAR PROSPECTIVE LANDLORD', 40, doc.y);
+      doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 110, doc.y);
       doc.moveDown(0.8);
-      doc.font(B).fontSize(16).text(`Mr. ${finalName}`, 40, doc.y);
-      doc.font(B).fontSize(16).text(`District-${finalLocation}`, 40, doc.y);
+      doc.font(B).fontSize(13).text(`Mr. ${finalName}`, 110, doc.y);
+      doc.font(B).fontSize(13).text(`District-${finalLocation}`, 110, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map
@@ -331,44 +332,44 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.font(R).fontSize(12).fillColor('black');
       doc.text(
         formatParagraph(cfg.paragraph1, pVars),
-        40, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
+        110, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         formatParagraph(cfg.paragraph2, pVars),
-        40, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
+        110, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
 
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
       const signY = 560;
-      const leftX = 120;
-      const rightX = 300;
+      const leftX = 110;
+      const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
       doc.font(B).fontSize(12).fillColor('black').text('Authorized Signatory', leftX, signY);
       if (assets.signature) {
-        try { doc.image(assets.signature, leftX, signY + 15, { width: 90, height: 40 }); }
-        catch { _drawFallbackSignature(doc, leftX, signY + 15); }
+        try { doc.image(assets.signature, leftX, signY + 30, { width: 80, height: 40 }); }
+        catch { _drawFallbackSignature(doc, leftX, signY + 30); }
       } else {
-        _drawFallbackSignature(doc, leftX, signY + 15);
+        _drawFallbackSignature(doc, leftX, signY + 30);
       }
       // Approval stamp below signature
       if (assets.stamp) {
-        try { doc.image(assets.stamp, leftX, signY + 60, { width: 80, height: 80 }); }
-        catch { _drawFallbackStamp(doc, leftX, signY + 60); }
+        try { doc.image(assets.stamp, leftX, signY + 70, { width: 60, height: 60 }); }
+        catch { _drawFallbackStamp(doc, leftX, signY + 70); }
       } else {
-        _drawFallbackStamp(doc, leftX, signY + 60);
+        _drawFallbackStamp(doc, leftX, signY + 70);
       }
       // Right column: QR prompt text and QR image stacked vertically
       // QR prompt text
       doc.font(B).fontSize(12).fillColor('black')
-        .text('Please scan QR code', rightX, signY);
+        .text('Please scan the bar code and check Approval', rightX, signY);
       // QR image below text
       if (assets.qr) {
-        try { doc.image(assets.qr, rightX, signY + 15, { width: 100, height: 100 }); }
-        catch { _drawFallbackQR(doc, rightX, signY + 15); }
+        try { doc.image(assets.qr, rightX, signY + 30, { width: 100, height: 100 }); }
+        catch { _drawFallbackQR(doc, rightX, signY + 30); }
       } else {
-        _drawFallbackQR(doc, rightX, signY + 15);
+        _drawFallbackQR(doc, rightX, signY + 30);
       }
 
       // Footer
