@@ -248,7 +248,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Title Text side-by-side with specified CSS styles
       doc.save();
       doc.fillColor('#0202c2ff');
-      doc.font('Helvetica-Bold').fontSize(62).text('HTL NETWORK', 115, headerBoxY + 15, {
+      doc.font('Helvetica').fontSize(64).text('HTL NETWORK', 115, headerBoxY + 15, {
         width: 600,
         height: 200,
         align: 'left',
@@ -297,14 +297,14 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(B).fontSize(12).fillColor('black').text(`Date : ${formattedDate}`, 30, doc.y);
+      doc.font(B).fontSize(12).fillColor('black').text(`Date : ${formattedDate}`, 50, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 30, doc.y);
+      doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 50, doc.y);
       doc.moveDown(0.8);
-      doc.font('Times-Bold').fontSize(15).text(`Mr. ${finalName}`, 30, doc.y);
-      doc.font('Times-Bold').fontSize(15).text(`District - ${finalLocation}`, 30, doc.y);
+      doc.font('Times-Bold').fontSize(15).text(`Mr. ${finalName}`, 50, doc.y);
+      doc.font('Times-Bold').fontSize(15).text(`District - ${finalLocation}`, 50, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map
@@ -332,18 +332,18 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.font(R).fontSize(12).fillColor('black');
       doc.text(
         formatParagraph(cfg.paragraph1, pVars),
-        30, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
+        50, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         formatParagraph(cfg.paragraph2, pVars),
-        30, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
+        50, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
 
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
       const signY = 550;
-      const leftX = 30;
+      const leftX = 50;
       const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
       doc.font('Times-Bold').fontSize(15).fillColor('black').text('Authorized Signatory', leftX, signY);
@@ -501,7 +501,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Page 4: Draw heading image
       drawPageHeader(doc, assets.hdrP4, 'Department of Science & Technology | Survey Report Part 2', B);
 
-      const p4imgX = 97; // centred on A4
+      const p4imgX = 147; // centred on A4
       const p4y = doc.y + 10;
 
       if (assets.p4img1) {
