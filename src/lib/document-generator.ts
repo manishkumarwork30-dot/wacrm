@@ -250,17 +250,17 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.fillColor('#0000ff'); // Bright/vibrant blue matching mockup
       doc.font(B).fontSize(60).text('HTL NETWORK', 150, headerBoxY + 15, { // large font size matching logo height
         width: 500,
-        height: 100,
+        height: 120,
         align: 'left',
         characterSpacing: 0
       });
       doc.restore();
 
       // Bold blue divider line matching the mockup layout (closer to header content)
-      doc.moveTo(0, 115).lineTo(660, 115).strokeColor('#2b5ce6').lineWidth(1.5).stroke();
+      doc.moveTo(0, 100).lineTo(660, 100).strokeColor('#0000FF').lineWidth(1.5).stroke();
 
       doc.x = 40;
-      doc.y = 120; // Reduced gap below the divider line
+      doc.y = 100; // Reduced gap below the divider line
 
       // APPROVAL LETTER title centered below header
       doc.save();
@@ -332,18 +332,18 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.font(R).fontSize(12).fillColor('black');
       doc.text(
         formatParagraph(cfg.paragraph1, pVars),
-        110, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
+        60, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
       doc.moveDown(1.0);
       doc.text(
         formatParagraph(cfg.paragraph2, pVars),
-        110, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
+        60, doc.y, { align: 'justify', lineGap: 2.5, width: 515 }
       );
 
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
       const signY = 560;
-      const leftX = 110;
+      const leftX = 60;
       const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
       doc.font(B).fontSize(12).fillColor('black').text('Authorized Signatory', leftX, signY);
