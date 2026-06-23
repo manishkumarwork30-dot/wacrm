@@ -247,9 +247,9 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Title Text side-by-side with specified CSS styles
       doc.save();
-      doc.fillColor('#0000FF'); 
-      doc.font('Helvetica').fontSize(140).text('HTL NETWORK', 115, headerBoxY + 15, { 
-        width: 800,
+      doc.fillColor('#0000FF');
+      doc.font('Helvetica').fontSize(78).text('HTL NETWORK', 115, headerBoxY + 15, {
+        width: 600,
         height: 200,
         align: 'left',
         characterSpacing: 2
@@ -260,7 +260,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.moveTo(0, 100).lineTo(660, 100).strokeColor('#0000FF').lineWidth(1.5).stroke();
 
       doc.x = 40;
-      doc.y = 100; // Reduced gap below the divider line
+      doc.y = 110; // Reduced gap below the divider line
 
       // APPROVAL LETTER title centered below header
       doc.save();
@@ -270,10 +270,10 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Underline style (red line closer to APPROVAL LETTER text)
       const titleWidth = doc.widthOfString('APPROVAL LETTER');
       const startX = (595.28 - titleWidth) / 2;
-      doc.moveTo(startX, doc.y + 1).lineTo(startX + titleWidth, doc.y + 1).strokeColor('red').lineWidth(2.5).stroke();
+      doc.moveTo(startX, doc.y).lineTo(startX + titleWidth, doc.y).strokeColor('red').lineWidth(2.5).stroke();
       doc.restore();
 
-      doc.moveDown(0.4);
+      doc.moveDown(0.3);
 
       // Date
       let formattedDate: string;
@@ -342,7 +342,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
-      const signY = 600;
+      const signY = 520;
       const leftX = 60;
       const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
@@ -355,29 +355,29 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       }
       // Approval stamp below signature
       if (assets.stamp) {
-        try { doc.image(assets.stamp, leftX + 20, signY + 80, { width: 80, height: 80 }); }
-        catch { _drawFallbackStamp(doc, leftX + 20, signY + 80); }
+        try { doc.image(assets.stamp, leftX + 20, signY + 85, { width: 75, height: 75 }); }
+        catch { _drawFallbackStamp(doc, leftX + 20, signY + 85); }
       } else {
-        _drawFallbackStamp(doc, leftX + 20, signY + 80);
+        _drawFallbackStamp(doc, leftX + 20, signY + 85);
       }
       // Right column: QR prompt text and QR image stacked vertically
       // QR prompt text
       doc.font('Times-Bold').fontSize(12).fillColor('black')
-        .text('Please scan the bar code and check Approval', rightX - 120, signY);
+        .text('Please scan the bar code and check Approval', rightX - 150, signY);
       // QR image below text
       if (assets.qr) {
-        try { doc.image(assets.qr, rightX - 60, signY + 50, { width: 120, height: 120 }); }
-        catch { _drawFallbackQR(doc, rightX - 60, signY + 50); }
+        try { doc.image(assets.qr, rightX - 70, signY + 50, { width: 120, height: 120 }); }
+        catch { _drawFallbackQR(doc, rightX - 70, signY + 50); }
       } else {
-        _drawFallbackQR(doc, rightX - 60, signY + 50);
+        _drawFallbackQR(doc, rightX - 70, signY + 50);
       }
 
       // Footer
       doc.save();
-      doc.moveTo(0, 750).lineTo(595, 750).strokeColor('black').lineWidth(1.5).stroke();
+      doc.moveTo(0, 770).lineTo(595, 770).strokeColor('black').lineWidth(1.5).stroke();
       doc.font(B).fontSize(13).fillColor('black').text(
         cfg.companyAddress,
-        0, 755, { align: 'center', width: 595 }
+        0, 780, { align: 'center', width: 595 }
       );
       doc.restore();
 
