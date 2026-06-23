@@ -247,8 +247,9 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Title Text side-by-side with specified CSS styles
       doc.save();
-      doc.fillColor('#0000ffff');
-      doc.font('Helvetica').fontSize(64).text('HTL NETWORK', 115, headerBoxY + 15, {
+      doc.opacity(1.0); // Reset opacity to 1.0 to prevent watermark opacity leak
+      doc.fillColor('#0000ff');
+      doc.font('Helvetica').fontSize(62).text('HTL NETWORK', 115, headerBoxY + 15, {
         width: 600,
         height: 200,
         align: 'left',
