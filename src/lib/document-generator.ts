@@ -248,7 +248,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Title Text side-by-side with specified CSS styles
       doc.save();
       doc.fillColor('#0000FF');
-      doc.font('Helvetica').fontSize(78).text('HTL NETWORK', 115, headerBoxY + 15, {
+      doc.font('Helvetica').fontSize(62).text('HTL NETWORK', 115, headerBoxY + 15, {
         width: 600,
         height: 200,
         align: 'left',
@@ -297,14 +297,14 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
         formattedDate = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
       }
 
-      doc.font(R).fontSize(10).fillColor('black').text(`Date : ${formattedDate}`, 60, doc.y);
+      doc.font(R).fontSize(12).fillColor('black').text(`Date : ${formattedDate}`, 60, doc.y);
       doc.moveDown(1.2);
 
       // Salutation
       doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 60, doc.y);
       doc.moveDown(0.8);
-      doc.font('Times-Bold').fontSize(13).text(`Mr. ${finalName}`, 60, doc.y);
-      doc.font('Times-Bold').fontSize(13).text(`District - ${finalLocation}`, 60, doc.y);
+      doc.font('Times-Bold').fontSize(14).text(`Mr. ${finalName}`, 60, doc.y);
+      doc.font('Times-Bold').fontSize(14).text(`District - ${finalLocation}`, 60, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map
@@ -342,7 +342,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Signature / Stamp / QR row
       // Use fixed y-coordinate so they don't overlap text or footer
-      const signY = 520;
+      const signY = 580;
       const leftX = 60;
       const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
@@ -374,10 +374,10 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
 
       // Footer
       doc.save();
-      doc.moveTo(0, 770).lineTo(595, 770).strokeColor('black').lineWidth(1.5).stroke();
+      doc.moveTo(0, 745).lineTo(595, 745).strokeColor('black').lineWidth(1.5).stroke();
       doc.font(B).fontSize(13).fillColor('black').text(
         cfg.companyAddress,
-        0, 780, { align: 'center', width: 595 }
+        0, 750, { align: 'center', width: 595 }
       );
       doc.restore();
 
