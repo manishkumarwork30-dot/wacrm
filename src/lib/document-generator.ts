@@ -248,9 +248,9 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Title Text side-by-side (fontSize 72 for ~100px height. Width set to 380 so it fits side-by-side without wrapping)
       doc.save();
       doc.fillColor('#0000ff'); // Bright/vibrant blue matching mockup
-      doc.font(B).fontSize(60).text('HTL NETWORK', 150, headerBoxY + 15, { // large font size matching logo height
+      doc.font(B).fontSize(60).text('HTL NETWORK', 110, headerBoxY + 15, { // large font size matching logo height
         width: 500,
-        height: 120,
+        height: 160,
         align: 'left',
         characterSpacing: 0
       });
@@ -260,7 +260,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.moveTo(0, 100).lineTo(660, 100).strokeColor('#0000FF').lineWidth(1.5).stroke();
 
       doc.x = 40;
-      doc.y = 100; // Reduced gap below the divider line
+      doc.y = 120; // Reduced gap below the divider line
 
       // APPROVAL LETTER title centered below header
       doc.save();
@@ -273,7 +273,7 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.moveTo(startX, doc.y + 1).lineTo(startX + titleWidth, doc.y + 1).strokeColor('red').lineWidth(2.5).stroke();
       doc.restore();
 
-      doc.moveDown(0.7);
+      doc.moveDown(0.4);
 
       // Date
       let formattedDate: string;
@@ -301,10 +301,10 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       doc.moveDown(1.2);
 
       // Salutation
-      doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 110, doc.y);
+      doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 60, doc.y);
       doc.moveDown(0.8);
-      doc.font(B).fontSize(13).text(`Mr. ${finalName}`, 110, doc.y);
-      doc.font(B).fontSize(13).text(`District-${finalLocation}`, 110, doc.y);
+      doc.font('Times-Bold').fontSize(13).text(`Mr. ${finalName}`, 60, doc.y);
+      doc.font('Times-Bold').fontSize(13).text(`District - ${finalLocation}`, 60, doc.y);
       doc.moveDown(1.2);
 
       // Interpolation vars map
@@ -346,36 +346,36 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       const leftX = 60;
       const rightX = 450;
       // Left column: Authorized Signatory text, signature image, approval stamp image stacked vertically
-      doc.font(B).fontSize(12).fillColor('black').text('Authorized Signatory', leftX, signY);
+      doc.font('Times-Bold').fontSize(14).fillColor('black').text('Authorized Signatory', leftX, signY);
       if (assets.signature) {
-        try { doc.image(assets.signature, leftX, signY + 30, { width: 80, height: 40 }); }
-        catch { _drawFallbackSignature(doc, leftX, signY + 30); }
+        try { doc.image(assets.signature, leftX, signY + 40, { width: 100, height: 50 }); }
+        catch { _drawFallbackSignature(doc, leftX, signY + 40); }
       } else {
-        _drawFallbackSignature(doc, leftX, signY + 30);
+        _drawFallbackSignature(doc, leftX, signY + 40);
       }
       // Approval stamp below signature
       if (assets.stamp) {
-        try { doc.image(assets.stamp, leftX, signY + 70, { width: 60, height: 60 }); }
-        catch { _drawFallbackStamp(doc, leftX, signY + 70); }
+        try { doc.image(assets.stamp, leftX + 20, signY + 70, { width: 70, height: 70 }); }
+        catch { _drawFallbackStamp(doc, leftX + 20, signY + 70); }
       } else {
-        _drawFallbackStamp(doc, leftX, signY + 70);
+        _drawFallbackStamp(doc, leftX + 20, signY + 70);
       }
       // Right column: QR prompt text and QR image stacked vertically
       // QR prompt text
-      doc.font(B).fontSize(12).fillColor('black')
-        .text('Please scan the bar code and check Approval', rightX, signY);
+      doc.font('Times-Bold').fontSize(12).fillColor('black')
+        .text('Please scan the bar code and check Approval', rightX - 60, signY);
       // QR image below text
       if (assets.qr) {
-        try { doc.image(assets.qr, rightX, signY + 30, { width: 100, height: 100 }); }
-        catch { _drawFallbackQR(doc, rightX, signY + 30); }
+        try { doc.image(assets.qr, rightX, signY + 50, { width: 120, height: 120 }); }
+        catch { _drawFallbackQR(doc, rightX, signY + 50); }
       } else {
-        _drawFallbackQR(doc, rightX, signY + 30);
+        _drawFallbackQR(doc, rightX, signY + 50);
       }
 
       // Footer
       doc.save();
       doc.moveTo(0, 740).lineTo(595, 740).strokeColor('black').lineWidth(1.5).stroke();
-      doc.font(B).fontSize(14).fillColor('black').text(
+      doc.font(B).fontSize(13).fillColor('black').text(
         cfg.companyAddress,
         0, 748, { align: 'center', width: 595 }
       );
