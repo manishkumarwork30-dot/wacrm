@@ -214,7 +214,7 @@ export function ChatbotConfig() {
     description: string,
     value: string,
     setValue: (v: string) => void,
-    fieldKey: Exclude<ConfigKey, 'is_active'>
+    fieldKey: Exclude<ConfigKey, 'is_active' | 'use_web_form'>
   ) => {
     return (
       <div className="space-y-2 relative group">
