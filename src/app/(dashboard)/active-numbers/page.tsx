@@ -75,7 +75,7 @@ export default function ActiveNumbersPage() {
             Active Numbers
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Check WhatsApp status &amp; DND for bulk phone numbers
+            Check WhatsApp status for bulk phone numbers
           </p>
         </div>
         <Button

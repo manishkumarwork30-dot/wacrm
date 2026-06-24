@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import * as xlsx from 'xlsx'
 
 /**
  * GET /api/active-numbers/jobs/[jobId]/export
- * Stream all results as a CSV download.
- * Query param: filter — 'all' | 'active' | 'inactive' | 'dnd'
+ * Stream all results as an Excel download.
+ * Query param: filter — 'all' | 'active' | 'inactive'
  */
 export async function GET(
   request: Request,
@@ -36,7 +37,7 @@ export async function GET(
     // Fetch all results (no pagination for export)
     let query = supabase
       .from('number_check_results')
-      .select('phone, whatsapp_active, dnd_status, checked_at')
+      .select('phone, whatsapp_active, checked_at')
       .eq('job_id', jobId)
       .order('phone', { ascending: true })
 
@@ -44,8 +45,6 @@ export async function GET(
       query = query.eq('whatsapp_active', true)
     } else if (filter === 'inactive') {
       query = query.eq('whatsapp_active', false)
-    } else if (filter === 'dnd') {
-      query = query.eq('dnd_status', true)
     }
 
     const { data: results, error } = await query
@@ -54,25 +53,32 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch results' }, { status: 500 })
     }
 
-    // Build CSV
-    const header = 'Phone,WhatsApp Active,DND,Checked At\n'
-    const rows = (results ?? [])
-      .map((r) =>
-        [
-          r.phone,
-          r.whatsapp_active === null ? 'Pending' : r.whatsapp_active ? 'Yes' : 'No',
-          r.dnd_status === null ? '-' : r.dnd_status ? 'Yes' : 'No',
-          r.checked_at ? new Date(r.checked_at).toLocaleString('en-IN') : '-',
-        ].join(',')
-      )
-      .join('\n')
+    // Build Excel Data
+    const excelData = (results ?? []).map((r) => ({
+      'Phone Number': r.phone,
+      'WhatsApp Active': r.whatsapp_active === null ? 'Pending' : r.whatsapp_active ? 'Yes' : 'No',
+      'Checked At': r.checked_at ? new Date(r.checked_at).toLocaleString('en-IN') : 'Pending',
+    }))
 
-    const csv = header + rows
-    const filename = `active-numbers-${job.name.replace(/\s+/g, '-')}-${filter}.csv`
+    // Generate Excel file buffer
+    const worksheet = xlsx.utils.json_to_sheet(excelData)
+    const workbook = xlsx.utils.book_new()
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Results')
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 18 }, // Phone Number
+      { wch: 18 }, // WhatsApp Active
+      { wch: 25 }, // Checked At
+    ]
 
-    return new Response(csv, {
+    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+
+    const filename = `active-numbers-${job.name.replace(/\s+/g, '-')}-${filter}.xlsx`
+
+    return new Response(buffer, {
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
       },
     })

@@ -30,8 +30,10 @@ CREATE INDEX IF NOT EXISTS idx_number_check_jobs_status
 
 ALTER TABLE number_check_jobs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage own check jobs" ON number_check_jobs;
+DROP POLICY IF EXISTS "Users can insert own check jobs" ON number_check_jobs;
+-- SELECT / UPDATE / DELETE: filter by owner
 CREATE POLICY "Users can manage own check jobs" ON number_check_jobs
-  FOR ALL USING (auth.uid() = user_id);
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ============================================================
 -- NUMBER_CHECK_RESULTS
@@ -59,6 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_number_check_results_phone
 
 ALTER TABLE number_check_results ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage own check results" ON number_check_results;
+DROP POLICY IF EXISTS "Service role can insert check results" ON number_check_results;
+
+-- All operations for results go through the parent job's owner check
 CREATE POLICY "Users can manage own check results" ON number_check_results
   FOR ALL
   USING (
@@ -67,9 +72,15 @@ CREATE POLICY "Users can manage own check results" ON number_check_results
       WHERE number_check_jobs.id = number_check_results.job_id
         AND number_check_jobs.user_id = auth.uid()
     )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM number_check_jobs
+      WHERE number_check_jobs.id = number_check_results.job_id
+        AND number_check_jobs.user_id = auth.uid()
+    )
   );
 
--- Service role needs unrestricted access for batch processing
-DROP POLICY IF EXISTS "Service role can insert check results" ON number_check_results;
+-- Service role bypass for batch processor (admin client inserts results)
 CREATE POLICY "Service role can insert check results" ON number_check_results
   FOR INSERT WITH CHECK (true);

@@ -34,11 +34,13 @@ export async function POST(request: Request) {
     // Normalise numbers — strip spaces, ensure leading + with country code
     const normalised = numbers
       .map((n: string) => {
-        const cleaned = String(n).replace(/[\s\-().]/g, '')
-        if (cleaned.startsWith('+')) return cleaned
-        if (cleaned.startsWith('0')) return `${country_code}${cleaned.slice(1)}`
-        if (cleaned.length === 10) return `${country_code}${cleaned}`
-        return cleaned
+        let cleaned = String(n).replace(/[\s\-().]/g, '')
+        if (cleaned.startsWith('0')) {
+          cleaned = `${country_code}${cleaned.slice(1)}`
+        } else if (cleaned.length === 10) {
+          cleaned = `${country_code}${cleaned}`
+        }
+        return cleaned.startsWith('+') ? cleaned : `+${cleaned}`
       })
       .filter((n) => n.length >= 10)
 

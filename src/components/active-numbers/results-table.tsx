@@ -42,7 +42,6 @@ const FILTER_OPTIONS: { value: FilterType; label: string; color: string }[] = [
   { value: 'all', label: 'All', color: 'text-slate-300' },
   { value: 'active', label: 'Active ✓', color: 'text-emerald-400' },
   { value: 'inactive', label: 'Inactive ✗', color: 'text-red-400' },
-  { value: 'dnd', label: 'DND', color: 'text-amber-400' },
 ];
 
 export function ResultsTable({ jobId, jobStatus }: ResultsTableProps) {
@@ -146,7 +145,7 @@ export function ResultsTable({ jobId, jobStatus }: ResultsTableProps) {
             ) : (
               <Download className="h-3.5 w-3.5" />
             )}
-            Export CSV
+            Export Excel
           </Button>
         </div>
       </div>
@@ -158,14 +157,13 @@ export function ResultsTable({ jobId, jobStatus }: ResultsTableProps) {
             <TableRow className="border-slate-800 hover:bg-transparent">
               <TableHead className="text-slate-400 text-xs">Phone Number</TableHead>
               <TableHead className="text-slate-400 text-xs text-center">WhatsApp</TableHead>
-              <TableHead className="text-slate-400 text-xs text-center hidden sm:table-cell">DND</TableHead>
               <TableHead className="text-slate-400 text-xs hidden md:table-cell">Checked At</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow className="border-slate-800">
-                <TableCell colSpan={4} className="text-center py-12">
+                <TableCell colSpan={3} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
                     <p className="text-sm text-slate-500">Loading results...</p>
@@ -174,7 +172,7 @@ export function ResultsTable({ jobId, jobStatus }: ResultsTableProps) {
               </TableRow>
             ) : results.length === 0 ? (
               <TableRow className="border-slate-800">
-                <TableCell colSpan={4} className="text-center py-12">
+                <TableCell colSpan={3} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Phone className="h-8 w-8 text-slate-700" />
                     <p className="text-sm text-slate-500">
@@ -202,17 +200,6 @@ export function ResultsTable({ jobId, jobStatus }: ResultsTableProps) {
                         <XCircle className="h-4 w-4" />
                         Inactive
                       </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center hidden sm:table-cell">
-                    {r.dnd_status === null ? (
-                      <span className="text-xs text-slate-600">—</span>
-                    ) : r.dnd_status ? (
-                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-400">
-                        DND
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-600">Clear</span>
                     )}
                   </TableCell>
                   <TableCell className="text-xs text-slate-500 hidden md:table-cell">
