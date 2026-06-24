@@ -66,7 +66,10 @@ export async function POST(request: Request) {
 
     if (jobError || !job) {
       console.error('Failed to create job:', jobError)
-      return NextResponse.json({ error: 'Failed to create job' }, { status: 500 })
+      return NextResponse.json(
+        { error: `Failed to create job: ${jobError?.message ?? 'unknown error'}. Have you run the SQL migration (supabase/migrations/active_numbers.sql) in Supabase?` },
+        { status: 500 }
+      )
     }
 
     // Batch-insert number rows (1000 at a time to avoid payload limits)
@@ -85,7 +88,10 @@ export async function POST(request: Request) {
         console.error('Failed to insert numbers batch:', insertErr)
         // Rollback job
         await supabase.from('number_check_jobs').delete().eq('id', job.id)
-        return NextResponse.json({ error: 'Failed to save numbers' }, { status: 500 })
+        return NextResponse.json(
+          { error: `Failed to save numbers: ${insertErr.message}` },
+          { status: 500 }
+        )
       }
     }
 
