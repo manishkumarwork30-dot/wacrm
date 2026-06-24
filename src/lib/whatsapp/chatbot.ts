@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendTextMessage, sendDocumentMessage, sendInteractiveButtons } from './meta-api';
+import { sendTextMessage, sendDocumentMessage, sendInteractiveButtons, sendCTAUrlButton } from './meta-api';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { generateCongratulationsDoc } from '@/lib/document-generator';
 
@@ -73,6 +73,29 @@ async function sendAndLogInteractiveButtons(
   await logBotMessage(conversationId, text, sent.messageId);
   return sent;
 }
+
+// Helper to send CTA URL button and log
+async function sendAndLogCTAUrlButton(
+  conversationId: string,
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  text: string,
+  buttonText: string,
+  url: string
+) {
+  const sent = await sendCTAUrlButton({
+    phoneNumberId,
+    accessToken,
+    to,
+    bodyText: text,
+    buttonText,
+    url,
+  });
+  await logBotMessage(conversationId, text, sent.messageId);
+  return sent;
+}
+
 
 // Helper to post lead details to Google Sheets Web App URL
 async function postToGoogleSheets(leadData: any) {
@@ -214,10 +237,18 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         collected_data: {}
       });
 
-      // Send greeting with "Apply Now" button
-      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
-        { id: 'apply_now', title: 'Apply Now' }
-      ]);
+      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
+
+      // Send greeting with "Apply Now" CTA URL button
+      await sendAndLogCTAUrlButton(
+        conversationId,
+        phoneNumberId,
+        accessToken,
+        senderPhone,
+        welcomeMsg,
+        'Apply Now',
+        formUrl
+      );
     } else {
       // Start chatbot run with questionnaire
       await db.from('chatbot_runs').insert({
@@ -264,15 +295,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   switch (currentState) {
     case 'AWAITING_FORM_SUBMISSION': {
       const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
-      const isApplyClick = textLower.includes('apply_now') || textLower.includes('apply');
+      const reminderMsg = `नमस्ते, आपका आवेदन अभी पूरा नहीं हुआ है। कृपया नीचे दिए गए "Apply Now" बटन पर क्लिक करके अपना फॉर्म पूरा करें।`;
 
-      if (isApplyClick) {
-        const linkMsg = `📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप के अंदर ही खुल जाएगा):\n👉 ${formUrl}`;
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, linkMsg);
-      } else {
-        const reminderMsg = `कृपया आवेदन करने के लिए ऊपर दिए गए "Apply Now" बटन पर क्लिक करें या सीधे इस लिंक पर जाएँ (यह लिंक व्हाट्सएप के अंदर ही खुल जाएगा):\n👉 ${formUrl}`;
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, reminderMsg);
-      }
+      await sendAndLogCTAUrlButton(
+        conversationId,
+        phoneNumberId,
+        accessToken,
+        senderPhone,
+        reminderMsg,
+        'Apply Now',
+        formUrl
+      );
       return true;
     }
 
