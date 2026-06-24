@@ -53,6 +53,9 @@ export function WhatsAppConfig() {
   const [accessToken, setAccessToken] = useState('');
   const [verifyToken, setVerifyToken] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
+  const [validatorProvider, setValidatorProvider] = useState('wassenger');
+  const [validatorApiKey, setValidatorApiKey] = useState('');
+  const [validatorKeyEdited, setValidatorKeyEdited] = useState(false);
 
   const webhookUrl =
     typeof window !== 'undefined'
@@ -80,6 +83,9 @@ export function WhatsAppConfig() {
         setAccessToken(MASKED_TOKEN);
         setVerifyToken('');
         setTokenEdited(false);
+        setValidatorProvider(data.validator_provider || 'wassenger');
+        setValidatorApiKey(data.validator_api_key ? MASKED_TOKEN : '');
+        setValidatorKeyEdited(false);
       } else {
         setConfig(null);
         setPhoneNumberId('');
@@ -87,6 +93,9 @@ export function WhatsAppConfig() {
         setAccessToken('');
         setVerifyToken('');
         setTokenEdited(false);
+        setValidatorProvider('wassenger');
+        setValidatorApiKey('');
+        setValidatorKeyEdited(false);
       }
 
       // Then verify health via the API (decrypts token + pings Meta)
@@ -101,6 +110,9 @@ export function WhatsAppConfig() {
             setStatusMessage('');
             if (payload.verify_token) {
               setVerifyToken(payload.verify_token);
+            }
+            if (payload.validator_api_key) {
+              setValidatorApiKey(MASKED_TOKEN);
             }
           } else {
             setConnectionStatus('disconnected');
@@ -154,7 +166,12 @@ export function WhatsAppConfig() {
         phone_number_id: phoneNumberId.trim(),
         waba_id: wabaId.trim() || null,
         verify_token: verifyToken.trim() || null,
+        validator_provider: validatorProvider,
       };
+
+      if (validatorKeyEdited && validatorApiKey !== MASKED_TOKEN) {
+        payload.validator_api_key = validatorApiKey.trim() || null;
+      }
 
       if (tokenEdited && accessToken !== MASKED_TOKEN && accessToken.trim()) {
         payload.access_token = accessToken.trim();
@@ -249,6 +266,8 @@ export function WhatsAppConfig() {
       setAccessToken('');
       setVerifyToken('');
       setTokenEdited(false);
+      setValidatorApiKey('');
+      setValidatorKeyEdited(false);
       setConnectionStatus('disconnected');
       setResetReason(null);
       setStatusMessage('');
@@ -407,6 +426,51 @@ export function WhatsAppConfig() {
               />
               <p className="text-xs text-slate-500">
                 A custom string you create. Must match the token you set in Meta webhook settings.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Validator Configuration */}
+        <Card className="bg-slate-900 border-slate-700 ring-0 ring-transparent">
+          <CardHeader>
+            <CardTitle className="text-white">Active Numbers Validator API</CardTitle>
+            <CardDescription className="text-slate-400">
+              Meta Cloud API does not support bulk number checking. Add a 3rd party API key here to check active WhatsApp numbers in bulk.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Validator Provider</Label>
+              <select
+                value={validatorProvider}
+                onChange={(e) => setValidatorProvider(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
+              >
+                <option value="wassenger">Wassenger API</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-slate-300">API Key / Token</Label>
+              <Input
+                type="password"
+                placeholder="Enter your validator API key"
+                value={validatorApiKey}
+                onChange={(e) => {
+                  setValidatorApiKey(e.target.value);
+                  setValidatorKeyEdited(true);
+                }}
+                onFocus={() => {
+                  if (validatorApiKey === MASKED_TOKEN) {
+                    setValidatorApiKey('');
+                    setValidatorKeyEdited(true);
+                  }
+                }}
+                className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              />
+              <p className="text-xs text-slate-500">
+                Optional. Required only if you want to use the &quot;Active Numbers&quot; bulk checking feature.
               </p>
             </div>
           </CardContent>

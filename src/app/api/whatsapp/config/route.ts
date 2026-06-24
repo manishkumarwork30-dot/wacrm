@@ -48,7 +48,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, access_token, status, verify_token')
+      .select('phone_number_id, access_token, status, verify_token, validator_provider, validator_api_key')
       .eq('user_id', user.id)
       .maybeSingle()
 
@@ -106,10 +106,21 @@ export async function GET() {
         }
       }
 
+      let decryptedValidatorKey: string | null = null
+      if (config.validator_api_key) {
+        try {
+          decryptedValidatorKey = decrypt(config.validator_api_key)
+        } catch {
+          // ignore
+        }
+      }
+
       return NextResponse.json({
         connected: true,
         phone_info: phoneInfo,
         verify_token: decryptedVerifyToken,
+        validator_provider: config.validator_provider,
+        validator_api_key: decryptedValidatorKey,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown Meta API error'
@@ -152,7 +163,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { phone_number_id, waba_id, access_token, verify_token } = body
+    const { phone_number_id, waba_id, access_token, verify_token, validator_provider, validator_api_key } = body
 
     if (!access_token || !phone_number_id) {
       return NextResponse.json(
@@ -210,19 +221,26 @@ export async function POST(request: Request) {
     // Upsert — overwrite any existing (possibly corrupted) config
     const { data: existing } = await supabaseAdmin()
       .from('whatsapp_config')
-      .select('id, verify_token')
+      .select('id, verify_token, validator_api_key')
       .eq('user_id', user.id)
       .maybeSingle()
 
     // Encrypt sensitive tokens before storing
     let encryptedAccessToken: string
     let encryptedVerifyToken: string | null = null
+    let encryptedValidatorKey: string | null = null
     try {
       encryptedAccessToken = encrypt(access_token)
       if (verify_token !== undefined) {
         encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
       } else if (existing) {
         encryptedVerifyToken = existing.verify_token
+      }
+      
+      if (validator_api_key !== undefined) {
+        encryptedValidatorKey = validator_api_key ? encrypt(validator_api_key) : null
+      } else if (existing) {
+        encryptedValidatorKey = existing.validator_api_key
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown encryption error'
@@ -244,6 +262,8 @@ export async function POST(request: Request) {
           waba_id: waba_id || null,
           access_token: encryptedAccessToken,
           verify_token: encryptedVerifyToken,
+          validator_provider: validator_provider || 'wassenger',
+          validator_api_key: encryptedValidatorKey,
           status: 'connected',
           connected_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -267,6 +287,8 @@ export async function POST(request: Request) {
           waba_id: waba_id || null,
           access_token: encryptedAccessToken,
           verify_token: encryptedVerifyToken,
+          validator_provider: validator_provider || 'wassenger',
+          validator_api_key: encryptedValidatorKey,
           status: 'connected',
           connected_at: new Date().toISOString(),
           display_phone_number: phoneInfo?.display_phone_number ?? null,

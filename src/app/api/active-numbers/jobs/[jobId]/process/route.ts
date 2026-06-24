@@ -7,7 +7,7 @@ const META_API_VERSION = 'v21.0'
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
 /** How many numbers to check per invocation */
-const BATCH_SIZE = 1000
+const BATCH_SIZE = 50
 
 function supabaseAdmin() {
   return createAdminClient(
@@ -22,41 +22,46 @@ function supabaseAdmin() {
  */
 async function checkWhatsAppNumbers(
   phones: string[],
-  phoneNumberId: string,
-  accessToken: string
+  validatorProvider: string,
+  validatorApiKey: string
 ): Promise<Map<string, boolean>> {
   const result = new Map<string, boolean>()
 
-  // Meta contacts API: POST /{phone-number-id}/contacts
-  // Returns array of contacts with wa_id if they are on WhatsApp
-  const response = await fetch(
-    `${META_API_BASE}/${phoneNumberId}/contacts`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        blocking: 'wait',
-        contacts: phones,
-        force_check: false,
-      }),
-    }
-  )
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}))
-    console.error('Meta contacts API error:', errData)
-    throw new Error(`Meta API Error: ${errData.error?.message || 'Unsupported endpoint'}`)
+  if (!validatorApiKey) {
+    throw new Error('Validator API key not configured. Go to Settings -> WhatsApp Config to add a 3rd party validator key.')
   }
 
-  const data = await response.json()
-  const contacts: Array<{ input: string; status: string; wa_id?: string }> =
-    data.contacts ?? []
-
-  for (const c of contacts) {
-    result.set(c.input, c.status === 'valid' || !!c.wa_id)
+  if (validatorProvider === 'wassenger') {
+    // Wassenger rate limit is typically 600 req/min for paid plans.
+    // We check sequentially or in small batches. Here we do it with a small concurrency of 5.
+    const concurrency = 5;
+    for (let i = 0; i < phones.length; i += concurrency) {
+      const chunk = phones.slice(i, i + concurrency);
+      await Promise.all(
+        chunk.map(async (phone) => {
+          try {
+            // Ensure phone is just numbers for Wassenger
+            const phoneStr = phone.replace(/\D/g, '')
+            const res = await fetch(`https://api.wassenger.com/v1/numbers/${phoneStr}/exists`, {
+              headers: {
+                Token: validatorApiKey,
+              },
+            })
+            if (res.ok) {
+              const data = await res.json()
+              // Wassenger returns { exists: true/false } or { status: "valid", exists: true }
+              result.set(phone, data.exists === true || data.status === 'valid')
+            } else {
+              result.set(phone, false)
+            }
+          } catch (e) {
+            result.set(phone, false)
+          }
+        })
+      )
+    }
+  } else {
+    throw new Error(`Unsupported validator provider: ${validatorProvider}`)
   }
 
   return result
@@ -100,7 +105,7 @@ export async function POST(
     // 3. Fetch user's WhatsApp config for API credentials
     const { data: config, error: configErr } = await admin
       .from('whatsapp_config')
-      .select('phone_number_id, access_token')
+      .select('phone_number_id, access_token, validator_provider, validator_api_key')
       .eq('user_id', job.user_id)
       .maybeSingle()
 
@@ -115,15 +120,26 @@ export async function POST(
       )
     }
 
-    let accessToken: string
+    let validatorApiKey: string | null = null
     try {
       accessToken = decrypt(config.access_token)
+      if (config.validator_api_key) {
+        validatorApiKey = decrypt(config.validator_api_key)
+      }
     } catch {
       await admin
         .from('number_check_jobs')
         .update({ status: 'failed', error_message: 'Token decryption failed' })
         .eq('id', jobId)
       return NextResponse.json({ error: 'Token decryption failed' }, { status: 500 })
+    }
+
+    if (!validatorApiKey) {
+      await admin
+        .from('number_check_jobs')
+        .update({ status: 'failed', error_message: 'Validator API key not configured' })
+        .eq('id', jobId)
+      return NextResponse.json({ error: 'Validator API key not configured' }, { status: 400 })
     }
 
     // 4. Fetch the next batch of unchecked numbers
@@ -149,12 +165,12 @@ export async function POST(
       return NextResponse.json({ status: 'completed', processed: 0, remaining: 0, job: finalJob })
     }
 
-    // 5. Check WhatsApp status via Meta API
+    // 5. Check WhatsApp status via Validator API
     const phones = pending.map((r) => r.phone)
     const waResults = await checkWhatsAppNumbers(
       phones,
-      config.phone_number_id,
-      accessToken
+      config.validator_provider || 'wassenger',
+      validatorApiKey
     )
 
     // 6. Update each result row
