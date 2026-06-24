@@ -174,7 +174,7 @@ export function ChatbotConfig() {
     }
   }
 
-  const handleResetField = (field: Exclude<ConfigKey, 'is_active'>) => {
+  const handleResetField = (field: Exclude<ConfigKey, 'is_active' | 'use_web_form'>) => {
     const value = DEFAULT_CONFIG[field];
     switch (field) {
       case 'welcome_msg': setWelcomeMsg(value); break;
