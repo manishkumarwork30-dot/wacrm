@@ -29,38 +29,34 @@ async function checkWhatsAppNumbers(
 
   // Meta contacts API: POST /{phone-number-id}/contacts
   // Returns array of contacts with wa_id if they are on WhatsApp
-  try {
-    const response = await fetch(
-      `${META_API_BASE}/${phoneNumberId}/contacts`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          blocking: 'wait',
-          contacts: phones,
-          force_check: false,
-        }),
-      }
-    )
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}))
-      console.error('Meta contacts API error:', errData)
-      throw new Error(`Meta API Error: ${errData.error?.message || 'Unknown error'}`)
+  const response = await fetch(
+    `${META_API_BASE}/${phoneNumberId}/contacts`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        blocking: 'wait',
+        contacts: phones,
+        force_check: false,
+      }),
     }
+  )
 
-    const data = await response.json()
-    const contacts: Array<{ input: string; status: string; wa_id?: string }> =
-      data.contacts ?? []
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}))
+    console.error('Meta contacts API error:', errData)
+    throw new Error(`Meta API Error: ${errData.error?.message || 'Unsupported endpoint'}`)
+  }
 
-    for (const c of contacts) {
-      result.set(c.input, c.status === 'valid' || !!c.wa_id)
-    }
-  } catch (err) {
-    console.error('Meta contacts API fetch error:', err)
+  const data = await response.json()
+  const contacts: Array<{ input: string; status: string; wa_id?: string }> =
+    data.contacts ?? []
+
+  for (const c of contacts) {
+    result.set(c.input, c.status === 'valid' || !!c.wa_id)
   }
 
   return result
