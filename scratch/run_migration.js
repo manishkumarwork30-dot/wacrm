@@ -1,8 +1,13 @@
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const envLocalPath = path.join(__dirname, '..', '.env.local');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Read .env.local
+const envLocalPath = path.join(__dirname, '../.env.local');
 const envContent = fs.readFileSync(envLocalPath, 'utf8');
 const env = {};
 envContent.split('\n').forEach(line => {
@@ -20,14 +25,18 @@ envContent.split('\n').forEach(line => {
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function run() {
-  console.log("Running migration query...");
-  const { data, error } = await supabase.rpc('admin_sql', {
-    query: "ALTER TABLE tower_leads ADD COLUMN IF NOT EXISTS approval_date TEXT;"
-  });
-  if (error) {
-    console.error("Migration failed:", error);
-  } else {
-    console.log("Migration succeeded:", data);
+  try {
+    const sqlPath = path.join(__dirname, '../supabase/migrations/021_approval_queue.sql');
+    const sql = fs.readFileSync(sqlPath, 'utf8');
+    console.log("Running migration...");
+    const { data, error } = await supabase.rpc('admin_sql', { query: sql });
+    if (error) {
+      console.error("Migration failed:", error);
+    } else {
+      console.log("Migration executed successfully:", data);
+    }
+  } catch (err) {
+    console.error("Error executing migration:", err);
   }
 }
 

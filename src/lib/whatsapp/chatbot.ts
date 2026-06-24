@@ -174,19 +174,19 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     if (isTrigger) {
       console.log(`[chatbot] Starting chatbot for contact: ${contactId}`);
       
-      // Start chatbot run
+      // Start chatbot run awaiting form submission
       await db.from('chatbot_runs').insert({
         user_id: userId,
         contact_id: contactId,
-        state: 'AWAITING_LAND_CONFIRMATION',
+        state: 'AWAITING_FORM_SUBMISSION',
         collected_data: {}
       });
 
-      // Send greeting with buttons
-      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
-        { id: 'yes_welcome', title: 'YES' },
-        { id: 'no_welcome', title: 'NO' }
-      ]);
+      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
+      const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
+
+      // Send greeting with form link
+      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, textToSend);
       return true; // consumed
     }
 
@@ -198,6 +198,7 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   const collectedData = run.collected_data || {};
 
   const validStates = [
+    'AWAITING_FORM_SUBMISSION',
     'AWAITING_LAND_CONFIRMATION',
     'AWAITING_NAME',
     'AWAITING_LOCATION',
@@ -215,6 +216,13 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   }
 
   switch (currentState) {
+    case 'AWAITING_FORM_SUBMISSION': {
+      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
+      const reminderMsg = `कृपया ऊपर दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
+      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, reminderMsg);
+      return true;
+    }
+
     case 'AWAITING_LAND_CONFIRMATION': {
       const isYes = ['yes', 'yes.', 'yes,', 'interested', 'हाँ', 'हाँ।', 'है', 'ha', 'haa', 'han', 'y', 'yes_welcome'].some(k => textLower.includes(k));
       const isNo = ['no', 'no.', 'no,', 'नहीं', 'नही', 'nah', 'n', 'no_welcome'].some(k => textLower.includes(k));
