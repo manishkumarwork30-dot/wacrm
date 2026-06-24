@@ -191,47 +191,51 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     .eq('contact_id', contactId)
     .maybeSingle();
 
-  // 2. Trigger check: If no active run and user triggers with keyword
-  if (!run) {
-    const isTrigger = ['hi', 'hello', 'hey', 'hlo', 'namaste', 'pranam', 'ram ram', 'installation', 'tower'].some(keyword =>
-      textLower.startsWith(keyword) || textLower === keyword
-    );
+  const isTrigger = ['hi', 'hello', 'hey', 'hlo', 'namaste', 'pranam', 'ram ram', 'installation', 'tower'].some(keyword =>
+    textLower.startsWith(keyword) || textLower === keyword
+  );
 
-    if (isTrigger) {
+  if (isTrigger) {
+    if (run) {
+      console.log(`[chatbot] Clearing existing run ${run.id} to restart chatbot for contact: ${contactId}`);
+      await db.from('chatbot_runs').delete().eq('id', run.id);
+    } else {
       console.log(`[chatbot] Starting chatbot for contact: ${contactId}`);
-      
-      const useWebForm = config.use_web_form !== false;
-
-      if (useWebForm) {
-        // Start chatbot run awaiting form submission
-        await db.from('chatbot_runs').insert({
-          user_id: userId,
-          contact_id: contactId,
-          state: 'AWAITING_FORM_SUBMISSION',
-          collected_data: {}
-        });
-
-        // Send greeting with "Apply Now" button
-        await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
-          { id: 'apply_now', title: 'Apply Now' }
-        ]);
-      } else {
-        // Start chatbot run with questionnaire
-        await db.from('chatbot_runs').insert({
-          user_id: userId,
-          contact_id: contactId,
-          state: 'AWAITING_LAND_CONFIRMATION',
-          collected_data: {}
-        });
-
-        // Send greeting with "Apply Now" button to start questionnaire
-        await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
-          { id: 'yes_welcome', title: 'Apply Now' }
-        ]);
-      }
-      return true; // consumed
     }
+    
+    const useWebForm = config.use_web_form !== false;
 
+    if (useWebForm) {
+      // Start chatbot run awaiting form submission
+      await db.from('chatbot_runs').insert({
+        user_id: userId,
+        contact_id: contactId,
+        state: 'AWAITING_FORM_SUBMISSION',
+        collected_data: {}
+      });
+
+      // Send greeting with "Apply Now" button
+      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
+        { id: 'apply_now', title: 'Apply Now' }
+      ]);
+    } else {
+      // Start chatbot run with questionnaire
+      await db.from('chatbot_runs').insert({
+        user_id: userId,
+        contact_id: contactId,
+        state: 'AWAITING_LAND_CONFIRMATION',
+        collected_data: {}
+      });
+
+      // Send greeting with "Apply Now" button to start questionnaire
+      await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
+        { id: 'yes_welcome', title: 'Apply Now' }
+      ]);
+    }
+    return true; // consumed
+  }
+
+  if (!run) {
     return false; // not consumed
   }
 
