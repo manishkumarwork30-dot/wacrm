@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/automations/admin-client';
-import { sendTextMessage } from '@/lib/whatsapp/meta-api';
+import { sendTextMessage, sendInteractiveButtons } from '@/lib/whatsapp/meta-api';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import { logBotMessage } from '@/lib/whatsapp/chatbot';
 
@@ -127,19 +127,19 @@ export async function POST(request: Request) {
         );
       }
 
-      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contact_id}`;
-      const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
-
       // 6. Send the initial welcome message via WhatsApp Meta Cloud API
-      const sent = await sendTextMessage({
+      const sent = await sendInteractiveButtons({
         phoneNumberId: config.phone_number_id,
         accessToken,
         to: toPhone,
-        text: textToSend
+        bodyText: welcomeMsg,
+        buttons: [
+          { id: 'apply_now', title: 'Apply Now' }
+        ]
       });
 
       // 7. Log message in local database
-      await logBotMessage(conversation_id, textToSend, sent.messageId);
+      await logBotMessage(conversation_id, welcomeMsg, sent.messageId);
     } else {
       // 5. Start new chatbot run with questionnaire
       const { error: runError } = await db.from('chatbot_runs').insert({
@@ -158,11 +158,14 @@ export async function POST(request: Request) {
       }
 
       // 6. Send the initial welcome message via WhatsApp Meta Cloud API
-      const sent = await sendTextMessage({
+      const sent = await sendInteractiveButtons({
         phoneNumberId: config.phone_number_id,
         accessToken,
         to: toPhone,
-        text: welcomeMsg
+        bodyText: welcomeMsg,
+        buttons: [
+          { id: 'yes_welcome', title: 'Apply Now' }
+        ]
       });
 
       // 7. Log message in local database

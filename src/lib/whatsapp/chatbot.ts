@@ -185,11 +185,10 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
           collected_data: {}
         });
 
-        const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
-        const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
-
-        // Send greeting with form link
-        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, textToSend);
+        // Send greeting with "Apply Now" button
+        await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
+          { id: 'apply_now', title: 'Apply Now' }
+        ]);
       } else {
         // Start chatbot run with questionnaire
         await db.from('chatbot_runs').insert({
@@ -199,10 +198,9 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
           collected_data: {}
         });
 
-        // Send greeting with YES/NO buttons
+        // Send greeting with "Apply Now" button to start questionnaire
         await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
-          { id: 'yes_welcome', title: 'YES' },
-          { id: 'no_welcome', title: 'NO' }
+          { id: 'yes_welcome', title: 'Apply Now' }
         ]);
       }
       return true; // consumed
@@ -236,8 +234,15 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   switch (currentState) {
     case 'AWAITING_FORM_SUBMISSION': {
       const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
-      const reminderMsg = `कृपया ऊपर दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, reminderMsg);
+      const isApplyClick = textLower.includes('apply_now') || textLower.includes('apply');
+
+      if (isApplyClick) {
+        const linkMsg = `📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप के अंदर ही खुल जाएगा):\n👉 ${formUrl}`;
+        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, linkMsg);
+      } else {
+        const reminderMsg = `कृपया आवेदन करने के लिए ऊपर दिए गए "Apply Now" बटन पर क्लिक करें या सीधे इस लिंक पर जाएँ (यह लिंक व्हाट्सएप के अंदर ही खुल जाएगा):\n👉 ${formUrl}`;
+        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, reminderMsg);
+      }
       return true;
     }
 
