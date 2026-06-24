@@ -174,19 +174,37 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     if (isTrigger) {
       console.log(`[chatbot] Starting chatbot for contact: ${contactId}`);
       
-      // Start chatbot run awaiting form submission
-      await db.from('chatbot_runs').insert({
-        user_id: userId,
-        contact_id: contactId,
-        state: 'AWAITING_FORM_SUBMISSION',
-        collected_data: {}
-      });
+      const useWebForm = config.use_web_form !== false;
 
-      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
-      const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
+      if (useWebForm) {
+        // Start chatbot run awaiting form submission
+        await db.from('chatbot_runs').insert({
+          user_id: userId,
+          contact_id: contactId,
+          state: 'AWAITING_FORM_SUBMISSION',
+          collected_data: {}
+        });
 
-      // Send greeting with form link
-      await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, textToSend);
+        const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
+        const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
+
+        // Send greeting with form link
+        await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, textToSend);
+      } else {
+        // Start chatbot run with questionnaire
+        await db.from('chatbot_runs').insert({
+          user_id: userId,
+          contact_id: contactId,
+          state: 'AWAITING_LAND_CONFIRMATION',
+          collected_data: {}
+        });
+
+        // Send greeting with YES/NO buttons
+        await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, welcomeMsg, [
+          { id: 'yes_welcome', title: 'YES' },
+          { id: 'no_welcome', title: 'NO' }
+        ]);
+      }
       return true; // consumed
     }
 

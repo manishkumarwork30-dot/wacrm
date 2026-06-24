@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 const DEFAULT_CONFIG = {
   is_active: true,
+  use_web_form: true,
   welcome_msg: `मोबाइल टावर स्थापना संबंधी अपडेट
 
 प्रिय महोदय/महोदया,
@@ -66,6 +67,7 @@ export function ChatbotConfig() {
   
   // Configuration states
   const [isActive, setIsActive] = useState(true);
+  const [useWebForm, setUseWebForm] = useState(true);
   const [welcomeMsg, setWelcomeMsg] = useState(DEFAULT_CONFIG.welcome_msg);
   const [askNameMsg, setAskNameMsg] = useState(DEFAULT_CONFIG.ask_name_msg);
   const [askStateMsg, setAskStateMsg] = useState(DEFAULT_CONFIG.ask_state_msg);
@@ -93,6 +95,7 @@ export function ChatbotConfig() {
         const buttonsConfig = (data.buttons as any) || {};
         
         setIsActive(buttonsConfig.is_active !== false);
+        setUseWebForm(buttonsConfig.use_web_form !== false);
         setWelcomeMsg(buttonsConfig.welcome_msg || DEFAULT_CONFIG.welcome_msg);
         setAskNameMsg(buttonsConfig.ask_name_msg || DEFAULT_CONFIG.ask_name_msg);
         setAskStateMsg(buttonsConfig.ask_state_msg || DEFAULT_CONFIG.ask_state_msg);
@@ -123,6 +126,7 @@ export function ChatbotConfig() {
       setSaving(true);
       const chatbotPayload = {
         is_active: isActive,
+        use_web_form: useWebForm,
         welcome_msg: welcomeMsg.trim(),
         ask_name_msg: askNameMsg.trim(),
         ask_state_msg: askStateMsg.trim(),
@@ -186,6 +190,7 @@ export function ChatbotConfig() {
   const handleResetAll = () => {
     if (confirm('Are you sure you want to reset all messages to default Hindi?')) {
       setIsActive(DEFAULT_CONFIG.is_active);
+      setUseWebForm(DEFAULT_CONFIG.use_web_form);
       setWelcomeMsg(DEFAULT_CONFIG.welcome_msg);
       setAskNameMsg(DEFAULT_CONFIG.ask_name_msg);
       setAskStateMsg(DEFAULT_CONFIG.ask_state_msg);
@@ -259,6 +264,32 @@ export function ChatbotConfig() {
               <Switch
                 checked={isActive}
                 onCheckedChange={setIsActive}
+                className="data-[state=checked]:bg-primary"
+              />
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Lead Capture Method */}
+      <Card className="bg-slate-900 border-slate-700 ring-0 ring-transparent">
+        <CardHeader className="border-b border-slate-800/60">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-white text-base">
+                Lead Capture Method
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                Choose between sending a single form link (In-App Webview Form) or asking questions one-by-one in the WhatsApp chat.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-primary">
+                {useWebForm ? 'In-App Webview Form (New)' : 'Chatbot Questionnaire (Old)'}
+              </span>
+              <Switch
+                checked={useWebForm}
+                onCheckedChange={setUseWebForm}
                 className="data-[state=checked]:bg-primary"
               />
             </div>

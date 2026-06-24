@@ -108,35 +108,66 @@ export async function POST(request: Request) {
       }).eq('contact_id', contact_id);
     }
 
-    // 5. Start new chatbot run
-    const { error: runError } = await db.from('chatbot_runs').insert({
-      user_id: user.id,
-      contact_id: contact_id,
-      state: 'AWAITING_FORM_SUBMISSION',
-      collected_data: {}
-    });
+    const useWebForm = configData.use_web_form !== false;
 
-    if (runError) {
-      console.error('[chatbot-trigger] Failed to start chatbot run:', runError.message);
-      return NextResponse.json(
-        { error: `Failed to start chatbot run: ${runError.message}` },
-        { status: 500 }
-      );
+    if (useWebForm) {
+      // 5. Start new chatbot run
+      const { error: runError } = await db.from('chatbot_runs').insert({
+        user_id: user.id,
+        contact_id: contact_id,
+        state: 'AWAITING_FORM_SUBMISSION',
+        collected_data: {}
+      });
+
+      if (runError) {
+        console.error('[chatbot-trigger] Failed to start chatbot run:', runError.message);
+        return NextResponse.json(
+          { error: `Failed to start chatbot run: ${runError.message}` },
+          { status: 500 }
+        );
+      }
+
+      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contact_id}`;
+      const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
+
+      // 6. Send the initial welcome message via WhatsApp Meta Cloud API
+      const sent = await sendTextMessage({
+        phoneNumberId: config.phone_number_id,
+        accessToken,
+        to: toPhone,
+        text: textToSend
+      });
+
+      // 7. Log message in local database
+      await logBotMessage(conversation_id, textToSend, sent.messageId);
+    } else {
+      // 5. Start new chatbot run with questionnaire
+      const { error: runError } = await db.from('chatbot_runs').insert({
+        user_id: user.id,
+        contact_id: contact_id,
+        state: 'AWAITING_LAND_CONFIRMATION',
+        collected_data: {}
+      });
+
+      if (runError) {
+        console.error('[chatbot-trigger] Failed to start chatbot run:', runError.message);
+        return NextResponse.json(
+          { error: `Failed to start chatbot run: ${runError.message}` },
+          { status: 500 }
+        );
+      }
+
+      // 6. Send the initial welcome message via WhatsApp Meta Cloud API
+      const sent = await sendTextMessage({
+        phoneNumberId: config.phone_number_id,
+        accessToken,
+        to: toPhone,
+        text: welcomeMsg
+      });
+
+      // 7. Log message in local database
+      await logBotMessage(conversation_id, welcomeMsg, sent.messageId);
     }
-
-    const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contact_id}`;
-    const textToSend = `${welcomeMsg}\n\n📋 कृपया नीचे दिए गए लिंक पर क्लिक करके अपना आवेदन फॉर्म भरें (यह लिंक व्हाट्सएप पर ही खुल जाएगा):\n👉 ${formUrl}`;
-
-    // 6. Send the initial welcome message via WhatsApp Meta Cloud API
-    const sent = await sendTextMessage({
-      phoneNumberId: config.phone_number_id,
-      accessToken,
-      to: toPhone,
-      text: textToSend
-    });
-
-    // 7. Log message in local database
-    await logBotMessage(conversation_id, textToSend, sent.messageId);
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
