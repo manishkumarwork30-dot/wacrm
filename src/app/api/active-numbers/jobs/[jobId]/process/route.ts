@@ -120,6 +120,7 @@ export async function POST(
       )
     }
 
+    let accessToken: string | null = null
     let validatorApiKey: string | null = null
     try {
       accessToken = decrypt(config.access_token)
