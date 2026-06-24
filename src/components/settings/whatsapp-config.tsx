@@ -54,6 +54,9 @@ export function WhatsAppConfig() {
   const [verifyToken, setVerifyToken] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
   const [validatorProvider, setValidatorProvider] = useState('wassenger');
+  const [validatorType, setValidatorType] = useState('wassenger');
+  const [rapidApiHost, setRapidApiHost] = useState('whatsapp-checker.p.rapidapi.com');
+  const [rapidApiPath, setRapidApiPath] = useState('/check?phone={phone}');
   const [validatorApiKey, setValidatorApiKey] = useState('');
   const [validatorKeyEdited, setValidatorKeyEdited] = useState(false);
 
@@ -83,7 +86,16 @@ export function WhatsAppConfig() {
         setAccessToken(MASKED_TOKEN);
         setVerifyToken('');
         setTokenEdited(false);
-        setValidatorProvider(data.validator_provider || 'wassenger');
+        const valProvider = data.validator_provider || 'wassenger';
+        setValidatorProvider(valProvider);
+        if (valProvider.startsWith('rapidapi:')) {
+          const parts = valProvider.split(':');
+          setValidatorType('rapidapi');
+          setRapidApiHost(parts[1] || 'whatsapp-checker.p.rapidapi.com');
+          setRapidApiPath(parts.slice(2).join(':') || '/check?phone={phone}');
+        } else {
+          setValidatorType(valProvider);
+        }
         setValidatorApiKey(data.validator_api_key ? MASKED_TOKEN : '');
         setValidatorKeyEdited(false);
       } else {
@@ -94,6 +106,9 @@ export function WhatsAppConfig() {
         setVerifyToken('');
         setTokenEdited(false);
         setValidatorProvider('wassenger');
+        setValidatorType('wassenger');
+        setRapidApiHost('whatsapp-checker.p.rapidapi.com');
+        setRapidApiPath('/check?phone={phone}');
         setValidatorApiKey('');
         setValidatorKeyEdited(false);
       }
@@ -162,11 +177,15 @@ export function WhatsAppConfig() {
       // the access_token server-side with ENCRYPTION_KEY. Skipping this
       // and writing direct to Supabase stores the token in plaintext,
       // which then fails decryption on every subsequent health check.
+      let finalProvider = validatorType;
+      if (validatorType === 'rapidapi') {
+        finalProvider = `rapidapi:${rapidApiHost.trim()}:${rapidApiPath.trim()}`;
+      }
       const payload: Record<string, unknown> = {
         phone_number_id: phoneNumberId.trim(),
         waba_id: wabaId.trim() || null,
         verify_token: verifyToken.trim() || null,
-        validator_provider: validatorProvider,
+        validator_provider: finalProvider,
       };
 
       if (validatorKeyEdited && validatorApiKey !== MASKED_TOKEN) {
@@ -443,13 +462,44 @@ export function WhatsAppConfig() {
             <div className="space-y-2">
               <Label className="text-slate-300">Validator Provider</Label>
               <select
-                value={validatorProvider}
-                onChange={(e) => setValidatorProvider(e.target.value)}
+                value={validatorType}
+                onChange={(e) => setValidatorType(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
               >
                 <option value="wassenger">Wassenger API</option>
+                <option value="rapidapi">RapidAPI (WhatsApp Status / Validator)</option>
               </select>
             </div>
+
+            {validatorType === 'rapidapi' && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-slate-300">RapidAPI Host (x-rapidapi-host)</Label>
+                  <Input
+                    placeholder="e.g. whatsapp-checker.p.rapidapi.com"
+                    value={rapidApiHost}
+                    onChange={(e) => setRapidApiHost(e.target.value)}
+                    className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Host name of the specific WhatsApp validator API you subscribed to on RapidAPI.
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-slate-300">RapidAPI Endpoint Path</Label>
+                  <Input
+                    placeholder="e.g. /check?phone={phone}"
+                    value={rapidApiPath}
+                    onChange={(e) => setRapidApiPath(e.target.value)}
+                    className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                  />
+                  <p className="text-xs text-slate-500">
+                    The relative path to the check endpoint. Use <code>{'{phone}'}</code> as placeholder for the phone number.
+                  </p>
+                </div>
+              </>
+            )}
             
             <div className="space-y-2">
               <Label className="text-slate-300">API Key / Token</Label>

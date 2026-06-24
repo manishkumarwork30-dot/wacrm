@@ -31,7 +31,18 @@ async function checkWhatsAppNumbers(
     throw new Error('Validator API key not configured. Go to Settings -> WhatsApp Config to add a 3rd party validator key.')
   }
 
-  if (validatorProvider === 'wassenger') {
+  let provider = validatorProvider
+  let host = 'whatsapp-checker.p.rapidapi.com'
+  let pathTemplate = '/check?phone={phone}'
+
+  if (validatorProvider.startsWith('rapidapi:')) {
+    provider = 'rapidapi'
+    const parts = validatorProvider.split(':')
+    host = parts[1] || 'whatsapp-checker.p.rapidapi.com'
+    pathTemplate = parts.slice(2).join(':') || '/check?phone={phone}'
+  }
+
+  if (provider === 'wassenger') {
     // Wassenger rate limit is typically 600 req/min for paid plans.
     // We check sequentially or in small batches. Here we do it with a small concurrency of 5.
     const concurrency = 5;
@@ -51,6 +62,43 @@ async function checkWhatsAppNumbers(
               const data = await res.json()
               // Wassenger returns { exists: true/false } or { status: "valid", exists: true }
               result.set(phone, data.exists === true || data.status === 'valid')
+            } else {
+              result.set(phone, false)
+            }
+          } catch (e) {
+            result.set(phone, false)
+          }
+        })
+      )
+    }
+  } else if (provider === 'rapidapi') {
+    const concurrency = 5;
+    for (let i = 0; i < phones.length; i += concurrency) {
+      const chunk = phones.slice(i, i + concurrency);
+      await Promise.all(
+        chunk.map(async (phone) => {
+          try {
+            const phoneStr = phone.replace(/\D/g, '')
+            const relativePath = pathTemplate.replace('{phone}', phoneStr)
+            const url = `https://${host}${relativePath}`
+
+            const res = await fetch(url, {
+              headers: {
+                'x-rapidapi-key': validatorApiKey,
+                'x-rapidapi-host': host,
+              },
+            })
+
+            if (res.ok) {
+              const data = await res.json()
+              const exists = 
+                data.exists === true || 
+                data.valid === true || 
+                data.status === 'valid' || 
+                data.status === 'active' || 
+                data.active === true ||
+                data.registered === true;
+              result.set(phone, exists)
             } else {
               result.set(phone, false)
             }
