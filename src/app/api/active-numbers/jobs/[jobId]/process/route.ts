@@ -49,8 +49,7 @@ async function checkWhatsAppNumbers(
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}))
       console.error('Meta contacts API error:', errData)
-      // Mark all as unknown (null) rather than false on API errors
-      return result
+      throw new Error(`Meta API Error: ${errData.error?.message || 'Unknown error'}`)
     }
 
     const data = await response.json()
@@ -218,8 +217,19 @@ export async function POST(
       activeInBatch: activeCount,
       job: updatedJob,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('POST /api/active-numbers/jobs/[jobId]/process error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    
+    // Attempt to mark job as failed
+    try {
+      const admin = supabaseAdmin()
+      const { params: resolvedParams } = await params as any;
+      await admin
+        .from('number_check_jobs')
+        .update({ status: 'failed', error_message: err.message })
+        .eq('id', resolvedParams?.jobId || '')
+    } catch (e) {}
+
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   }
 }
