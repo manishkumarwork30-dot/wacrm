@@ -41,6 +41,9 @@ const DEFAULT_CONFIG = {
   ask_pincode_msg: `3️⃣ आपके क्षेत्र का पिन कोड (PIN Code) क्या है?`,
   end_no_land_msg: `ठीक है 🙏\n\nकोई बात नहीं। अगर भविष्य में जमीन हो या किसी और को जरूरत हो, तो हमसे जरूर संपर्क करें।\n\nमोबाइल टावर स्थापना – आपकी सेवा में सदैव तत्पर।`,
   payment_msg: `बहुत अच्छा! 🎉\n\nआपका स्थान हमारी सर्वेक्षण टीम द्वारा जांचा जाएगा।\n\n📋 पंजीकरण की प्रक्रिया:\n\n✅ पंजीकरण शुल्क: ₹2,550/-\n\nयह शुल्क आपकी बुकिंग और भागीदारी की पुष्टि के लिए आवश्यक है\n\nपंजीकरण शुल्क जमा करने के बाद ही आगे की प्रक्रिया (जैसे NOC और एग्रीमेंट) शुरू होगी। QR कोड / Payment Details आपको जल्द ही भेजी जाएंगी।\n\nकृपया थोड़ा इंतजार करें। 🙏`,
+  use_template_welcome: false,
+  welcome_template_name: 'tower_lead_welcome',
+  welcome_template_lang: 'hi',
 };
 
 type ConfigKey = keyof typeof DEFAULT_CONFIG;
@@ -62,6 +65,15 @@ export function ChatbotConfig() {
   const [askPinMsg, setAskPinMsg] = useState(DEFAULT_CONFIG.ask_pincode_msg);
   const [endNoLandMsg, setEndNoLandMsg] = useState(DEFAULT_CONFIG.end_no_land_msg);
   const [paymentMsg, setPaymentMsg] = useState(DEFAULT_CONFIG.payment_msg);
+  
+  // Template welcome states
+  const [useTemplateWelcome, setUseTemplateWelcome] = useState(false);
+  const [welcomeTemplateName, setWelcomeTemplateName] = useState('tower_lead_welcome');
+  const [welcomeTemplateLang, setWelcomeTemplateLang] = useState('hi');
+  
+  // WhatsApp Flow states
+  const [flowId, setFlowId] = useState('');
+  const [settingUpFlow, setSettingUpFlow] = useState(false);
 
   const fetchConfig = useCallback(async (userId: string) => {
     try {
@@ -90,6 +102,10 @@ export function ChatbotConfig() {
         setAskPinMsg(buttonsConfig.ask_pincode_msg || DEFAULT_CONFIG.ask_pincode_msg);
         setEndNoLandMsg(buttonsConfig.end_no_land_msg || DEFAULT_CONFIG.end_no_land_msg);
         setPaymentMsg(buttonsConfig.payment_msg || DEFAULT_CONFIG.payment_msg);
+        setUseTemplateWelcome(buttonsConfig.use_template_welcome === true);
+        setWelcomeTemplateName(buttonsConfig.welcome_template_name || 'tower_lead_welcome');
+        setWelcomeTemplateLang(buttonsConfig.welcome_template_lang || 'hi');
+        setFlowId(buttonsConfig.flow_id || '');
       }
     } catch (err) {
       console.error('fetchConfig error:', err);
@@ -121,6 +137,10 @@ export function ChatbotConfig() {
         ask_pincode_msg: askPinMsg.trim(),
         end_no_land_msg: endNoLandMsg.trim(),
         payment_msg: paymentMsg.trim(),
+        use_template_welcome: useTemplateWelcome,
+        welcome_template_name: welcomeTemplateName.trim(),
+        welcome_template_lang: welcomeTemplateLang.trim(),
+        flow_id: flowId.trim(),
       };
 
       if (templateId) {
@@ -162,8 +182,24 @@ export function ChatbotConfig() {
     }
   }
 
-  const handleResetField = (field: Exclude<ConfigKey, 'is_active' | 'use_web_form'>) => {
-    const value = DEFAULT_CONFIG[field];
+  async function handleSetupFlow() {
+    if (!user) return;
+    try {
+      setSettingUpFlow(true);
+      const res = await fetch(`/api/whatsapp/flows/setup?userId=${user.id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to setup flow');
+      setFlowId(data.flow_id);
+      toast.success('Flow created & published! Click Save below to apply it.');
+    } catch (err: any) {
+      toast.error(err.message || 'Error setting up flow');
+    } finally {
+      setSettingUpFlow(false);
+    }
+  }
+
+  const handleResetField = (field: Exclude<ConfigKey, 'is_active' | 'use_web_form' | 'use_template_welcome'>) => {
+    const value = DEFAULT_CONFIG[field] as string;
     switch (field) {
       case 'welcome_msg': setWelcomeMsg(value); break;
       case 'ask_name_msg': setAskNameMsg(value); break;
@@ -185,6 +221,9 @@ export function ChatbotConfig() {
       setAskPinMsg(DEFAULT_CONFIG.ask_pincode_msg);
       setEndNoLandMsg(DEFAULT_CONFIG.end_no_land_msg);
       setPaymentMsg(DEFAULT_CONFIG.payment_msg);
+      setUseTemplateWelcome(false);
+      setWelcomeTemplateName('tower_lead_welcome');
+      setWelcomeTemplateLang('hi');
       toast.success('Reset all settings to default');
     }
   };
@@ -202,7 +241,7 @@ export function ChatbotConfig() {
     description: string,
     value: string,
     setValue: (v: string) => void,
-    fieldKey: Exclude<ConfigKey, 'is_active' | 'use_web_form'>
+    fieldKey: Exclude<ConfigKey, 'is_active' | 'use_web_form' | 'use_template_welcome'>
   ) => {
     return (
       <div className="space-y-2 relative group">
@@ -283,6 +322,82 @@ export function ChatbotConfig() {
             </div>
           </div>
         </CardHeader>
+        
+        {useWebForm && (
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-center justify-between border-t border-slate-800/60 pt-4">
+              <div className="space-y-1">
+                <Label className="text-slate-200 font-semibold">Use Approved Meta Template</Label>
+                <p className="text-slate-400 text-xs">
+                  Required to force the form to open directly inside WhatsApp's native mobile pop-up/webview. Must be pre-approved in Meta Business Manager.
+                </p>
+              </div>
+              <Switch
+                checked={useTemplateWelcome}
+                onCheckedChange={setUseTemplateWelcome}
+                className="data-[state=checked]:bg-primary"
+              />
+            </div>
+
+            {useTemplateWelcome && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-800/60">
+                <div className="space-y-2">
+                  <Label className="text-slate-300 font-semibold text-xs">Meta Welcome Template Name</Label>
+                  <input
+                    type="text"
+                    value={welcomeTemplateName}
+                    onChange={(e) => setWelcomeTemplateName(e.target.value)}
+                    placeholder="e.g. tower_lead_welcome"
+                    className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Template must have 1 URL button pointing to: <code>https://whatsapp-crm-fawn.vercel.app/apply/{"{{1}}"}</code>
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-300 font-semibold text-xs">Template Language Code</Label>
+                  <input
+                    type="text"
+                    value={welcomeTemplateLang}
+                    onChange={(e) => setWelcomeTemplateLang(e.target.value)}
+                    placeholder="e.g. hi (Hindi) or en (English)"
+                    className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-slate-800/60 pt-4 space-y-4">
+              <div className="space-y-1">
+                <Label className="text-slate-200 font-semibold">Native WhatsApp Flow (Recommended)</Label>
+                <p className="text-slate-400 text-xs">
+                  Create an in-app form so users don't need to visit external links. If a Flow ID is provided, the chatbot will prioritize sending the native Flow form instead of the web link.
+                </p>
+              </div>
+              <div className="flex gap-4 items-end">
+                <div className="flex-1 space-y-2">
+                  <Label className="text-slate-300 font-semibold text-xs">Flow ID</Label>
+                  <input
+                    type="text"
+                    value={flowId}
+                    onChange={(e) => setFlowId(e.target.value)}
+                    placeholder="Enter Meta WhatsApp Flow ID"
+                    className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
+                  />
+                </div>
+                <Button 
+                  onClick={handleSetupFlow}
+                  disabled={settingUpFlow}
+                  variant="outline"
+                  className="h-10 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                >
+                  {settingUpFlow ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                  {settingUpFlow ? 'Creating...' : 'Auto-Create Flow on Meta'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       {/* Message Customization */}

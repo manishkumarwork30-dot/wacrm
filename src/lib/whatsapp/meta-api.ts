@@ -468,6 +468,77 @@ export async function sendCTAUrlButton(
   return { messageId: data.messages[0].id }
 }
 
+export interface SendFlowMessageArgs {
+  phoneNumberId: string
+  accessToken: string
+  to: string
+  bodyText: string
+  buttonText: string
+  flowId: string
+  flowCta: string
+  headerText?: string
+  footerText?: string
+  contextMessageId?: string
+}
+
+/**
+ * Send an interactive message that opens a WhatsApp Flow native form.
+ */
+export async function sendFlowMessage(
+  args: SendFlowMessageArgs
+): Promise<MetaSendResult> {
+  const {
+    phoneNumberId, accessToken, to,
+    bodyText, buttonText, flowId, flowCta,
+    headerText, footerText, contextMessageId,
+  } = args
+  validateInteractiveBody(bodyText)
+  validateInteractiveHeaderFooter(headerText, footerText)
+
+  const interactive: Record<string, unknown> = {
+    type: 'flow',
+    body: { text: bodyText },
+    action: {
+      name: 'flow',
+      parameters: {
+        flow_message_version: '3',
+        flow_token: 'TOWER_APP_FLOW',
+        flow_id: flowId,
+        flow_cta: flowCta || buttonText,
+        flow_action: 'navigate',
+        flow_action_payload: {
+          screen: 'TOWER_APPLICATION',
+        },
+      },
+    },
+  }
+  if (headerText) interactive.header = { type: 'text', text: headerText }
+  if (footerText) interactive.footer = { text: footerText }
+
+  const body: Record<string, unknown> = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive,
+  }
+  if (contextMessageId) body.context = { message_id: contextMessageId }
+
+  const url = `${META_API_BASE}/${phoneNumberId}/messages`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+  const data = await response.json()
+  return { messageId: data.messages[0].id }
+}
 
 export interface InteractiveListRow {
   /** Stable id sent back in the webhook when tapped (≤ 200 chars). */

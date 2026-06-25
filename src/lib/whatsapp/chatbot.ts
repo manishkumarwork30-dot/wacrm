@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendTextMessage, sendDocumentMessage, sendInteractiveButtons, sendCTAUrlButton } from './meta-api';
+import { sendTextMessage, sendDocumentMessage, sendInteractiveButtons, sendCTAUrlButton, sendTemplateMessage, sendFlowMessage } from './meta-api';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { generateCongratulationsDoc } from '@/lib/document-generator';
 
@@ -91,6 +91,29 @@ async function sendAndLogCTAUrlButton(
     bodyText: text,
     buttonText,
     url,
+  });
+  return sent;
+}
+
+// Helper to send WhatsApp Flow message and log
+async function sendAndLogFlowMessage(
+  conversationId: string,
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  text: string,
+  buttonText: string,
+  flowId: string,
+  flowCta: string
+) {
+  const sent = await sendFlowMessage({
+    phoneNumberId,
+    accessToken,
+    to,
+    bodyText: text,
+    buttonText,
+    flowId,
+    flowCta,
   });
   await logBotMessage(conversationId, text, sent.messageId);
   return sent;
@@ -227,28 +250,66 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     }
     
     const useWebForm = config.use_web_form !== false;
+    const useTemplateWelcome = config.use_template_welcome === true;
+    const welcomeTemplateName = config.welcome_template_name || 'tower_lead_welcome';
+    const welcomeTemplateLang = config.welcome_template_lang || 'hi';
 
     if (useWebForm) {
-      // Start chatbot run awaiting form submission
-      await db.from('chatbot_runs').insert({
-        user_id: userId,
-        contact_id: contactId,
-        state: 'AWAITING_FORM_SUBMISSION',
-        collected_data: {}
-      });
+      if (config.flow_id) {
+        // Start chatbot run awaiting flow submission
+        await db.from('chatbot_runs').insert({
+          user_id: userId,
+          contact_id: contactId,
+          state: 'AWAITING_FLOW_SUBMISSION',
+          collected_data: {}
+        });
 
-      const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
+        // Send greeting with native WhatsApp Flow
+        await sendAndLogFlowMessage(
+          conversationId,
+          phoneNumberId,
+          accessToken,
+          senderPhone,
+          welcomeMsg,
+          'Apply Now',
+          config.flow_id,
+          'Apply Now'
+        );
+      } else {
+        // Fallback: Start chatbot run awaiting web form submission
+        await db.from('chatbot_runs').insert({
+          user_id: userId,
+          contact_id: contactId,
+          state: 'AWAITING_FORM_SUBMISSION',
+          collected_data: {}
+        });
 
-      // Send greeting with "Apply Now" CTA URL button
-      await sendAndLogCTAUrlButton(
-        conversationId,
-        phoneNumberId,
-        accessToken,
-        senderPhone,
-        welcomeMsg,
-        'Apply Now',
-        formUrl
-      );
+        if (useTemplateWelcome) {
+          console.log(`[chatbot] Triggering welcome message via Meta approved template: ${welcomeTemplateName}`);
+          // Send approved template message to force WhatsApp to open in-app popup browser
+          const sent = await sendTemplateMessage({
+            phoneNumberId,
+            accessToken,
+            to: senderPhone,
+            templateName: welcomeTemplateName,
+            language: welcomeTemplateLang,
+            params: [contactId] // Passed to dynamic URL button: /apply/{{1}}
+          });
+          await logBotMessage(conversationId, `[Template Send: ${welcomeTemplateName}]`, sent.messageId);
+        } else {
+          const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
+          // Send greeting with "Apply Now" CTA URL button (free-form message)
+          await sendAndLogCTAUrlButton(
+            conversationId,
+            phoneNumberId,
+            accessToken,
+            senderPhone,
+            welcomeMsg,
+            'Apply Now',
+            formUrl
+          );
+        }
+      }
     } else {
       // Start chatbot run with questionnaire
       await db.from('chatbot_runs').insert({
@@ -275,6 +336,7 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   const collectedData = run.collected_data || {};
 
   const validStates = [
+    'AWAITING_FLOW_SUBMISSION',
     'AWAITING_FORM_SUBMISSION',
     'AWAITING_LAND_CONFIRMATION',
     'AWAITING_NAME',
@@ -293,6 +355,64 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
   }
 
   switch (currentState) {
+    case 'AWAITING_FLOW_SUBMISSION': {
+      try {
+        // messageText will be the JSON string from nfm_reply.response_json
+        const flowData = JSON.parse(messageText);
+        
+        if (flowData.name && flowData.location && flowData.pin_code) {
+          // Flow submitted successfully
+          const updatedData = {
+            name: flowData.name,
+            location: `${flowData.location}, ${flowData.state}`,
+            state: flowData.state,
+            pin_code: flowData.pin_code,
+            mobile_no: senderPhone,
+            land_size: flowData.land_size,
+            ownership: flowData.ownership
+          };
+          
+          await db.from('chatbot_runs').update({
+            state: 'AWAITING_TERMS_AGREEMENT',
+            collected_data: updatedData,
+            updated_at: new Date().toISOString()
+          }).eq('id', run.id);
+
+          await sendAndLogInteractiveButtons(conversationId, phoneNumberId, accessToken, senderPhone, surveyMsg, [
+            { id: 'yes_terms', title: 'YES' },
+            { id: 'no_terms', title: 'NO' }
+          ]);
+        } else {
+          // Send reminder if they just typed text instead of submitting the form
+          const reminderMsg = `नमस्ते, आपका फॉर्म अभी पूरा नहीं हुआ है। कृपया "Apply Now" बटन पर क्लिक करके फॉर्म भरें।`;
+          await sendAndLogFlowMessage(
+            conversationId,
+            phoneNumberId,
+            accessToken,
+            senderPhone,
+            reminderMsg,
+            'Apply Now',
+            config.flow_id,
+            'Apply Now'
+          );
+        }
+      } catch (e) {
+        // Not a valid JSON, meaning they typed something else instead of submitting the form. Remind them.
+        const reminderMsg = `नमस्ते, आपका फॉर्म अभी पूरा नहीं हुआ है। कृपया "Apply Now" बटन पर क्लिक करके फॉर्म भरें।`;
+        await sendAndLogFlowMessage(
+          conversationId,
+          phoneNumberId,
+          accessToken,
+          senderPhone,
+          reminderMsg,
+          'Apply Now',
+          config.flow_id,
+          'Apply Now'
+        );
+      }
+      return true;
+    }
+
     case 'AWAITING_FORM_SUBMISSION': {
       const formUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-crm-fawn.vercel.app'}/apply/${contactId}`;
       const reminderMsg = `नमस्ते, आपका आवेदन अभी पूरा नहीं हुआ है। कृपया नीचे दिए गए "Apply Now" बटन पर क्लिक करके अपना फॉर्म पूरा करें।`;

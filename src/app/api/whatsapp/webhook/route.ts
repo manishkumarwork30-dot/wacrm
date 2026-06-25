@@ -41,9 +41,10 @@ interface WhatsAppMessage {
    * to advance the per-contact run.
    */
   interactive?: {
-    type: 'button_reply' | 'list_reply'
+    type: 'button_reply' | 'list_reply' | 'nfm_reply'
     button_reply?: { id: string; title: string }
     list_reply?: { id: string; title: string; description?: string }
+    nfm_reply?: { response_json: string; body: string; name: string }
   }
   /** Present when the customer swipe-replies to one of our messages. */
   context?: { id: string }
@@ -860,9 +861,16 @@ async function parseMessageContent(
       // The customer tapped a reply button or a list row on a message
       // we previously sent. Meta delivers `interactive.button_reply` for
       // 3-button messages and `interactive.list_reply` for list messages.
-      // Use the human-readable title as contentText so the inbox bubble
-      // renders the tap legibly ("Existing customer"), and stash the
-      // stable id separately so the Flows engine can route on it.
+      // Or `interactive.nfm_reply` for WhatsApp Flows submissions.
+      
+      if (message.interactive?.type === 'nfm_reply' && message.interactive.nfm_reply) {
+        return {
+          ...empty,
+          contentText: message.interactive.nfm_reply.response_json, // JSON string of form data
+          interactiveReplyId: 'flow_submission',
+        }
+      }
+
       const reply =
         message.interactive?.button_reply ?? message.interactive?.list_reply
       if (reply?.id) {
