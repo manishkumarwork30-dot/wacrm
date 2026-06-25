@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendTextMessage, sendDocumentMessage, sendInteractiveButtons, sendCTAUrlButton, sendTemplateMessage, sendFlowMessage } from './meta-api';
+import { resolveStateName, resolveOwnershipLabel } from './tower-flow-json';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { generateCongratulationsDoc } from '@/lib/document-generator';
 
@@ -362,14 +363,17 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
         
         if (flowData.name && flowData.location && flowData.pin_code) {
           // Flow submitted successfully
+          const resolvedState = resolveStateName(flowData.state);
+          const resolvedOwnership = resolveOwnershipLabel(flowData.ownership);
+
           const updatedData = {
             name: flowData.name,
-            location: `${flowData.location}, ${flowData.state}`,
-            state: flowData.state,
+            location: `${flowData.location}, ${resolvedState}`,
+            state: resolvedState,
             pin_code: flowData.pin_code,
             mobile_no: senderPhone,
             land_size: flowData.land_size,
-            ownership: flowData.ownership
+            ownership: resolvedOwnership
           };
           
           await db.from('chatbot_runs').update({
