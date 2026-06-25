@@ -711,13 +711,15 @@ async function processMessage(
     | 'new_message_received'
     | 'keyword_match'
   )[] = []
-  // Content-level triggers are suppressed when a flow consumed the
-  // message — see the comment block above.
+  // Content-level triggers. We suppress new_message_received if a flow consumed
+  // the message to avoid duplicate general auto-replies, but keyword_match 
+  // should always fire so explicit custom trigger messages always run their automations!
   if (!flowConsumed) {
-    automationTriggers.push('new_message_received', 'keyword_match')
-    
-    // --- AUTO-CHATS BOT INTEGRATION REMOVED ---
+    automationTriggers.push('new_message_received')
   }
+  automationTriggers.push('keyword_match')
+    
+  // --- AUTO-CHATS BOT INTEGRATION REMOVED ---
   // new_contact_created fires only when the webhook just auto-created the
   // contact row. first_inbound_message fires whenever this is the contact's
   // first-ever customer-sent message — a superset that also catches
