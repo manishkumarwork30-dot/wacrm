@@ -238,12 +238,15 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
     .eq('contact_id', contactId)
     .maybeSingle();
 
-  const isTrigger = ['hi', 'hello', 'hey', 'hlo', 'namaste', 'pranam', 'ram ram', 'installation', 'tower'].some(keyword =>
+  const isGreeting = ['hi', 'hello', 'hey', 'hlo', 'namaste', 'pranam', 'ram ram', 'installation', 'tower', 'start'].some(keyword =>
     textLower.startsWith(keyword) || textLower === keyword
   );
 
+  // Trigger the chatbot if it's their very first message (!run) OR if they send a greeting to restart
+  const isTrigger = !run || isGreeting;
+
   if (isTrigger) {
-    if (run) {
+    if (run && isGreeting) {
       console.log(`[chatbot] Clearing existing run ${run.id} to restart chatbot for contact: ${contactId}`);
       await db.from('chatbot_runs').delete().eq('id', run.id);
     } else {
