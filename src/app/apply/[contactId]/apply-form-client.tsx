@@ -8,6 +8,7 @@ interface ApplyFormClientProps {
     contactId: string
     name: string
     phone: string
+    botPhone: string
   }
 }
 
@@ -100,6 +101,22 @@ export default function ApplyFormClient({ initialData }: ApplyFormClientProps) {
     }
   }
 
+  useEffect(() => {
+    if (submitted && initialData.botPhone) {
+      // Auto-redirect back to WhatsApp after 3 seconds
+      const timer = setTimeout(() => {
+        const text = encodeURIComponent('I have submitted my application online. Please check.');
+        window.location.href = `whatsapp://send?phone=${initialData.botPhone}&text=${text}`;
+        
+        // Fallback if URL scheme fails
+        setTimeout(() => {
+          window.location.href = `https://wa.me/${initialData.botPhone}?text=${text}`;
+        }, 1000);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [submitted, initialData.botPhone]);
+
   if (submitted) {
     return (
       <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-8 rounded-2xl shadow-2xl text-center space-y-6 animate-fade-in">
@@ -117,10 +134,13 @@ export default function ApplyFormClient({ initialData }: ApplyFormClientProps) {
         </p>
         <div className="pt-4">
           <button 
-            onClick={() => window.close()} 
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 px-6 rounded-xl transition duration-200"
+            onClick={() => {
+              const text = encodeURIComponent('I have submitted my application online. Please check.');
+              window.location.href = `whatsapp://send?phone=${initialData.botPhone}&text=${text}`;
+            }} 
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-6 rounded-xl transition duration-200 shadow-lg shadow-primary/20"
           >
-            Close Window
+            Return to WhatsApp
           </button>
         </div>
       </div>

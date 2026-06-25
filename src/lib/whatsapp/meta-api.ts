@@ -505,6 +505,7 @@ export async function sendFlowMessage(
     action: {
       name: 'flow',
       parameters: {
+        mode: 'draft',
         flow_message_version: '3',
         flow_token: 'TOWER_APP_FLOW',
         flow_id: flowId,
