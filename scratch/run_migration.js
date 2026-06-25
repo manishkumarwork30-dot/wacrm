@@ -26,7 +26,7 @@ const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE
 
 async function run() {
   try {
-    const sqlPath = path.join(__dirname, '../supabase/migrations/021_approval_queue.sql');
+    const sqlPath = path.join(__dirname, '../supabase/migrations/022_twilio_opted_out.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
     console.log("Running migration...");
     const { data, error } = await supabase.rpc('admin_sql', { query: sql });
