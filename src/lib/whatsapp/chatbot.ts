@@ -294,7 +294,19 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
             to: senderPhone,
             templateName: welcomeTemplateName,
             language: welcomeTemplateLang,
-            params: [contactId] // Passed to dynamic URL button: /apply/{{1}}
+            components: [
+              {
+                type: 'button',
+                sub_type: 'url',
+                index: 0,
+                parameters: [
+                  {
+                    type: 'text',
+                    text: contactId // Passed to dynamic URL button: /apply/{{1}}
+                  }
+                ]
+              }
+            ]
           });
           await logBotMessage(conversationId, `[Template Send: ${welcomeTemplateName}]`, sent.messageId);
         } else {

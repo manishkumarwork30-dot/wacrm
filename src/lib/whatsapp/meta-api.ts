@@ -168,7 +168,8 @@ export interface SendTemplateMessageArgs {
   to: string
   templateName: string
   language?: string
-  params?: string[]
+  params?: string[] // Kept for backward compatibility (body text)
+  components?: any[] // Support for button/header variables
   /** Meta's message_id of the message being replied to. */
   contextMessageId?: string
 }
@@ -187,6 +188,7 @@ export async function sendTemplateMessage(
     templateName,
     language = 'en_US',
     params,
+    components,
     contextMessageId,
   } = args
   const url = `${META_API_BASE}/${phoneNumberId}/messages`
@@ -196,7 +198,9 @@ export async function sendTemplateMessage(
     language: { code: language },
   }
 
-  if (params && params.length > 0) {
+  if (components && components.length > 0) {
+    template.components = components;
+  } else if (params && params.length > 0) {
     template.components = [
       {
         type: 'body',
