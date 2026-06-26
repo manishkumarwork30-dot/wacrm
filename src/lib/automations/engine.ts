@@ -526,7 +526,9 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
 
       const caption = interpolate(cfg.caption || `Congratulations ${lead.name}!`, args);
 
-      await sendDocumentMessage({
+      const conversationId = await resolveConversationId(args);
+
+      const sentPdf = await sendDocumentMessage({
         phoneNumberId: waAccount.phone_number_id,
         accessToken: decrypt(waAccount.access_token),
         to: contact.phone,
@@ -534,6 +536,24 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         filename,
         caption
       });
+
+      // Insert message into DB so it shows up in chats/inbox
+      await db.from('messages').insert({
+        conversation_id: conversationId,
+        sender_type: 'bot',
+        content_type: 'document',
+        content_text: caption,
+        media_url: publicUrlData.publicUrl,
+        message_id: sentPdf.messageId,
+        status: 'sent',
+      });
+
+      // Update conversation last message info
+      await db.from('conversations').update({
+        last_message_text: caption || "Sent Approval PDF",
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', conversationId);
 
       // Update lead status
       await db.from('tower_leads').update({ status: 'Approval Sent', updated_at: new Date().toISOString() }).eq('id', lead.id);

@@ -727,67 +727,7 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
 
         await sendAndLogBotMessage(conversationId, phoneNumberId, accessToken, senderPhone, paymentMsg);
 
-        // SEND APPROVAL PDF AUTOMATICALLY
-        try {
-          console.log('[chatbot] Generating and sending Approval PDF automatically...');
-          const finalName = collectedData.name || 'Unknown';
-          const finalLocation = collectedData.location || 'Unknown Location';
-          collectedData.date = new Date().toISOString();
-          const pdfBuffer = await generateCongratulationsDoc(collectedData);
-          const fileName = `approval_${leadId || contactId}_${Date.now()}.pdf`;
-          
-          const { error: uploadError } = await db.storage.from('documents').upload(fileName, pdfBuffer, {
-            contentType: 'application/pdf',
-            upsert: true
-          });
-          
-          if (!uploadError) {
-            const { data: { publicUrl } } = db.storage.from('documents').getPublicUrl(fileName);
-            const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`;
-            
-            const sentPdf = await sendDocumentMessage({
-              phoneNumberId,
-              accessToken,
-              to: senderPhone,
-              documentUrl: publicUrl,
-              filename: fileName,
-              caption: captionText
-            });
-            await db.from('messages').insert({
-              conversation_id: conversationId,
-              sender_type: 'agent',
-              content_type: 'document',
-              content_text: captionText,
-              media_url: publicUrl,
-              message_id: sentPdf.messageId,
-              status: 'sent',
-            });
-            
-            await db.from('conversations').update({
-              last_message_text: "Sent Approval PDF",
-              last_message_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }).eq('id', conversationId);
-            
-            if (leadId) {
-              await db.from('tower_leads').update({ status: 'Approval Sent' }).eq('id', leadId);
-              await postToGoogleSheets({
-                name: collectedData.name || 'Unknown',
-                mobile_no: collectedData.mobile_no || senderPhone,
-                location: collectedData.location || 'Not provided',
-                state: collectedData.state || '',
-                pin_code: collectedData.pin_code || '',
-                land_size: collectedData.land_size || '',
-                ownership: collectedData.is_owned || '',
-                status: 'Approval Sent'
-              }).catch(err => console.error('[chatbot] Google Sheets sync error:', err));
-            }
-          } else {
-            console.error('[chatbot] Failed to upload generated PDF:', uploadError);
-          }
-        } catch (pdfErr) {
-          console.error('[chatbot] Failed to auto-send Approval PDF:', pdfErr);
-        }
+        // Removed immediate send of PDF so it is only sent next day via the scheduled queue.
 
         runAutomationsForTrigger({
           userId,
