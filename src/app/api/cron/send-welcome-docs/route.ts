@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     }
 
     // Get the first WA account config from DB to get access token and phone number ID
-    const { data: accounts } = await db.from('whatsapp_accounts').select('*').limit(1);
+    const { data: accounts } = await db.from('whatsapp_config').select('*').limit(1);
     const waAccount = accounts?.[0];
 
     if (!waAccount) {

@@ -711,12 +711,9 @@ async function processMessage(
     | 'new_message_received'
     | 'keyword_match'
   )[] = []
-  // Content-level triggers. We suppress new_message_received if a flow consumed
-  // the message to avoid duplicate general auto-replies, but keyword_match 
-  // should always fire so explicit custom trigger messages always run their automations!
-  if (!flowConsumed) {
-    automationTriggers.push('new_message_received')
-  }
+  // Content-level triggers. We want new_message_received and keyword_match 
+  // to always fire so all trigger messages run their automations!
+  automationTriggers.push('new_message_received')
   automationTriggers.push('keyword_match')
     
   // --- AUTO-CHATS BOT INTEGRATION REMOVED ---

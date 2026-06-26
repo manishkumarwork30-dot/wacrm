@@ -19,6 +19,7 @@ import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate } from './meta-send'
 import { generateCongratulationsDoc } from '@/lib/document-generator'
 import { sendDocumentMessage } from '@/lib/whatsapp/meta-api'
+import { decrypt } from '@/lib/whatsapp/encryption'
 
 // ------------------------------------------------------------
 // Public API
@@ -479,7 +480,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!lead) throw new Error('No tower_lead found for this contact');
 
       // Get WA account
-      const { data: accounts } = await db.from('whatsapp_accounts').select('*').eq('user_id', args.automation.user_id).limit(1);
+      const { data: accounts } = await db.from('whatsapp_config').select('*').eq('user_id', args.automation.user_id).limit(1);
       const waAccount = accounts?.[0];
       if (!waAccount) throw new Error('No WA account found');
 
@@ -527,7 +528,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
 
       await sendDocumentMessage({
         phoneNumberId: waAccount.phone_number_id,
-        accessToken: waAccount.access_token,
+        accessToken: decrypt(waAccount.access_token),
         to: contact.phone,
         documentUrl: publicUrlData.publicUrl,
         filename,
