@@ -1085,6 +1085,7 @@ export function MessageThread({
                           reactions={msgReactions}
                           currentUserId={user?.id}
                           onToggleReaction={handlePillToggle}
+                          contactId={contact?.id}
                         />
                       </MessageActions>
                     );

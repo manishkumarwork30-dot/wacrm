@@ -93,6 +93,7 @@ async function sendAndLogCTAUrlButton(
     buttonText,
     url,
   });
+  await logBotMessage(conversationId, text, sent.messageId);
   return sent;
 }
 

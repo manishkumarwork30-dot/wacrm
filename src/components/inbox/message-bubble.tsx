@@ -18,14 +18,6 @@ import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { MessageReactions } from "./message-reactions";
 
-interface MessageBubbleProps {
-  message: Message;
-  /** Pre-computed quote info for messages that reply to another. */
-  reply?: { authorLabel: string; preview: string } | null;
-  reactions?: MessageReaction[];
-  currentUserId?: string;
-  onToggleReaction?: (emoji: string) => void;
-}
 
 function StatusIcon({ status }: { status: Message["status"] }) {
   switch (status) {
@@ -260,15 +252,82 @@ function MessageContent({ message }: { message: Message }) {
   }
 }
 
+interface MessageBubbleProps {
+  message: Message;
+  /** Pre-computed quote info for messages that reply to another. */
+  reply?: { authorLabel: string; preview: string } | null;
+  reactions?: MessageReaction[];
+  currentUserId?: string;
+  onToggleReaction?: (emoji: string) => void;
+  contactId?: string;
+}
+
+interface BotButton {
+  title: string;
+  url?: string;
+}
+
+function getBotButtons(text: string | null, contactId?: string): BotButton[] {
+  if (!text) return [];
+  const textLower = text.toLowerCase();
+  
+  // Welcome Msg or Reminder Msg
+  if (
+    textLower.includes('apply now') ||
+    textLower.includes('आवेदन के लिए नीचे दिए गए') ||
+    textLower.includes('आवेदन अभी पूरा नहीं हुआ है') ||
+    textLower.includes('फॉर्म अभी पूरा नहीं हुआ है')
+  ) {
+    const url = contactId ? `/apply/${contactId}` : undefined;
+    return [{ title: 'Apply Now', url }];
+  }
+  
+  // Survey/Agreement Msg
+  if (
+    textLower.includes('शर्तों से सहमत हैं') && 
+    (textLower.includes('सहमत होने के लिए') || textLower.includes('सहमत'))
+  ) {
+    if (textLower.includes('सहमत')) {
+      return [
+        { title: 'YES (सहमत)' },
+        { title: 'NO (असहमत)' }
+      ];
+    }
+    return [
+      { title: 'YES' },
+      { title: 'NO' }
+    ];
+  }
+  
+  // AWAITING_LAND_CONFIRMATION reprompt
+  if (textLower.includes('yes या no में जवाब दें')) {
+    return [
+      { title: 'YES' },
+      { title: 'NO' }
+    ];
+  }
+  
+  // askMobileMsg
+  if (textLower.includes('इसी व्हाट्सएप नंबर का उपयोग')) {
+    return [
+      { title: 'YES (Same No)' }
+    ];
+  }
+  
+  return [];
+}
+
 export function MessageBubble({
   message,
   reply,
   reactions,
   currentUserId,
   onToggleReaction,
+  contactId,
 }: MessageBubbleProps) {
   const isAgent = message.sender_type === "agent" || message.sender_type === "bot";
   const time = format(new Date(message.created_at), "HH:mm");
+  const buttons = isAgent ? getBotButtons(message.content_text, contactId) : [];
 
   // Row alignment + width cap are owned by <MessageActions> so its hover
   // group matches the bubble's content area, not the full row.
@@ -291,6 +350,39 @@ export function MessageBubble({
           <ReplyQuote authorLabel={reply.authorLabel} preview={reply.preview} />
         )}
         <MessageContent message={message} />
+        
+        {/* Render buttons if any */}
+        {buttons && buttons.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2 border-t border-white/20 pt-2 w-full min-w-[200px]">
+            {buttons.map((btn, index) => {
+              if (btn.url) {
+                return (
+                  <a
+                    key={index}
+                    href={btn.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold text-white hover:bg-white/25 transition-all duration-200 shadow-sm border border-white/10"
+                  >
+                    <span>{btn.title}</span>
+                    <svg className="h-3.5 w-3.5 shrink-0 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                );
+              }
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-center rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 select-none cursor-default"
+                >
+                  {btn.title}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div
           className={cn(
             "mt-1 flex items-center gap-1",
