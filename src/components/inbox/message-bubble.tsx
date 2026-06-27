@@ -267,7 +267,7 @@ interface BotButton {
   url?: string;
 }
 
-function getBotButtons(text: string | null, contactId?: string): BotButton[] {
+function getBotButtons(text: string | null | undefined, contactId?: string): BotButton[] {
   if (!text) return [];
   const textLower = text.toLowerCase();
   
