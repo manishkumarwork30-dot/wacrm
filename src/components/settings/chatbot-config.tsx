@@ -44,6 +44,9 @@ const DEFAULT_CONFIG = {
   use_template_welcome: false,
   welcome_template_name: 'tower_lead_welcome',
   welcome_template_lang: 'hi',
+  approval_template_name: '',
+  approval_template_lang: 'hi',
+  approval_template_has_doc_header: true,
 };
 
 type ConfigKey = keyof typeof DEFAULT_CONFIG;
@@ -70,6 +73,11 @@ export function ChatbotConfig() {
   const [useTemplateWelcome, setUseTemplateWelcome] = useState(false);
   const [welcomeTemplateName, setWelcomeTemplateName] = useState('tower_lead_welcome');
   const [welcomeTemplateLang, setWelcomeTemplateLang] = useState('hi');
+
+  // Fallback template states for closed 24h window
+  const [approvalTemplateName, setApprovalTemplateName] = useState('');
+  const [approvalTemplateLang, setApprovalTemplateLang] = useState('hi');
+  const [approvalTemplateHasDocHeader, setApprovalTemplateHasDocHeader] = useState(true);
   
   // WhatsApp Flow states
   const [flowId, setFlowId] = useState('');
@@ -105,6 +113,9 @@ export function ChatbotConfig() {
         setUseTemplateWelcome(buttonsConfig.use_template_welcome === true);
         setWelcomeTemplateName(buttonsConfig.welcome_template_name || 'tower_lead_welcome');
         setWelcomeTemplateLang(buttonsConfig.welcome_template_lang || 'hi');
+        setApprovalTemplateName(buttonsConfig.approval_template_name || '');
+        setApprovalTemplateLang(buttonsConfig.approval_template_lang || 'hi');
+        setApprovalTemplateHasDocHeader(buttonsConfig.approval_template_has_doc_header !== false);
         setFlowId(buttonsConfig.flow_id || '');
       }
     } catch (err) {
@@ -140,6 +151,9 @@ export function ChatbotConfig() {
         use_template_welcome: useTemplateWelcome,
         welcome_template_name: welcomeTemplateName.trim(),
         welcome_template_lang: welcomeTemplateLang.trim(),
+        approval_template_name: approvalTemplateName.trim(),
+        approval_template_lang: approvalTemplateLang.trim(),
+        approval_template_has_doc_header: approvalTemplateHasDocHeader,
         flow_id: flowId.trim(),
       };
 
@@ -224,6 +238,9 @@ export function ChatbotConfig() {
       setUseTemplateWelcome(false);
       setWelcomeTemplateName('tower_lead_welcome');
       setWelcomeTemplateLang('hi');
+      setApprovalTemplateName('');
+      setApprovalTemplateLang('hi');
+      setApprovalTemplateHasDocHeader(true);
       toast.success('Reset all settings to default');
     }
   };
@@ -481,6 +498,56 @@ export function ChatbotConfig() {
                 setPaymentMsg,
                 'payment_msg'
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white text-base">4. Scheduled Approval PDF & 24h Fallback Template</CardTitle>
+              <CardDescription className="text-slate-400">
+                Setup a fallback template to automatically deliver the approval message if the WhatsApp 24-hour customer service window closes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-300 font-semibold text-xs">Meta Fallback Template Name</Label>
+                  <input
+                    type="text"
+                    value={approvalTemplateName}
+                    onChange={(e) => setApprovalTemplateName(e.target.value)}
+                    placeholder="e.g. tower_approval_fallback"
+                    className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    If blank, no fallback template is sent outside the 24-hour window.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-300 font-semibold text-xs">Template Language Code</Label>
+                  <input
+                    type="text"
+                    value={approvalTemplateLang}
+                    onChange={(e) => setApprovalTemplateLang(e.target.value)}
+                    placeholder="e.g. hi (Hindi) or en (English)"
+                    className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-800/60 pt-4">
+                <div className="space-y-1">
+                  <Label className="text-slate-200 font-semibold text-sm">Template Has Document Header</Label>
+                  <p className="text-slate-400 text-xs">
+                    Enable if your Meta template has a Document header. We will attach the generated Approval Letter PDF automatically.
+                  </p>
+                </div>
+                <Switch
+                  checked={approvalTemplateHasDocHeader}
+                  onCheckedChange={setApprovalTemplateHasDocHeader}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
             </CardContent>
           </Card>
         </div>

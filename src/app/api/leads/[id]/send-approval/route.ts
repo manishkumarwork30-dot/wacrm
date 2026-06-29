@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateCongratulationsDoc } from '@/lib/document-generator'
-import { sendDocumentMessage } from '@/lib/whatsapp/meta-api'
+import { sendDocumentMessage, sendTemplateMessage } from '@/lib/whatsapp/meta-api'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { decrypt } from '@/lib/whatsapp/encryption'
 
@@ -161,16 +161,78 @@ export async function POST(
       return NextResponse.json({ error: 'WhatsApp config not found' }, { status: 400 })
     }
 
+    // Fetch chatbot config to get fallback approval template settings
+    const { data: chatbotTemplate } = await supabaseAdmin()
+      .from('message_templates')
+      .select('buttons')
+      .eq('user_id', lead.user_id)
+      .eq('name', '__chatbot_config')
+      .maybeSingle()
+
+    const chatbotConfig = (chatbotTemplate?.buttons as any) || {}
+
     // 8. Send WhatsApp Message
     const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`
-    const sentPdf = await sendDocumentMessage({
-      phoneNumberId: config.phone_number_id,
-      accessToken: decrypt(config.access_token),
-      to: phone,
-      documentUrl: publicUrl,
-      filename: fileName,
-      caption: captionText
-    })
+    
+    let sentMessageId: string
+    let logContentText = captionText
+    let logContentType = 'document'
+    let logMediaUrl: string | null = publicUrl
+
+    try {
+      const sentPdf = await sendDocumentMessage({
+        phoneNumberId: config.phone_number_id,
+        accessToken: decrypt(config.access_token),
+        to: phone,
+        documentUrl: publicUrl,
+        filename: fileName,
+        caption: captionText
+      })
+      sentMessageId = sentPdf.messageId
+    } catch (sendErr: any) {
+      const errMsg = sendErr?.message || String(sendErr)
+      const isWindowClosed = errMsg.includes('24 hours') || errMsg.includes('window') || errMsg.includes('131047')
+
+      if (isWindowClosed && chatbotConfig.approval_template_name) {
+        console.log(`[send-approval] 24-hour window closed for ${phone}. Falling back to template: ${chatbotConfig.approval_template_name}`)
+
+        const templateLang = chatbotConfig.approval_template_lang || 'hi'
+        let components: any[] = []
+
+        if (chatbotConfig.approval_template_has_doc_header) {
+          components.push({
+            type: 'header',
+            parameters: [
+              {
+                type: 'document',
+                document: {
+                  link: publicUrl,
+                  filename: `Approval_Letter_${finalName}.pdf`
+                }
+              }
+            ]
+          })
+        }
+
+        const sentTemplate = await sendTemplateMessage({
+          phoneNumberId: config.phone_number_id,
+          accessToken: decrypt(config.access_token),
+          to: phone,
+          templateName: chatbotConfig.approval_template_name,
+          language: templateLang,
+          components: components.length > 0 ? components : undefined
+        })
+
+        sentMessageId = sentTemplate.messageId
+        logContentText = `[Template Fallback: ${chatbotConfig.approval_template_name}] Approval Letter`
+        logContentType = chatbotConfig.approval_template_has_doc_header ? 'document' : 'text'
+        if (!chatbotConfig.approval_template_has_doc_header) {
+          logMediaUrl = null
+        }
+      } else {
+        throw sendErr
+      }
+    }
 
     // Find or create conversation to log message into CRM Inbox
     let conversationId = null
@@ -200,14 +262,14 @@ export async function POST(
       await supabaseAdmin().from('messages').insert({
         conversation_id: conversationId,
         sender_type: 'agent',
-        content_type: 'document',
-        content_text: captionText,
-        media_url: publicUrl,
-        message_id: sentPdf.messageId,
+        content_type: logContentType,
+        content_text: logContentText,
+        media_url: logMediaUrl,
+        message_id: sentMessageId,
         status: 'sent',
       })
       await supabaseAdmin().from('conversations').update({
-        last_message_text: "Sent Approval PDF",
+        last_message_text: logContentType === 'document' ? "Sent Approval PDF" : "Sent Approval Template",
         last_message_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).eq('id', conversationId)

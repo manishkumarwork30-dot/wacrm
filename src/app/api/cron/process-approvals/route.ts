@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generateCongratulationsDoc } from '@/lib/document-generator'
-import { sendDocumentMessage } from '@/lib/whatsapp/meta-api'
+import { sendDocumentMessage, sendTemplateMessage } from '@/lib/whatsapp/meta-api'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -53,10 +53,14 @@ export async function GET(request: Request) {
 
   try {
     // 2. Validate IST sending window (9:00 AM to 1:00 PM IST)
-    const now = new Date()
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-    const istTime = new Date(utc + (3600000 * 5.5))
-    const istHours = istTime.getHours()
+    const istHours = parseInt(
+      new Date().toLocaleString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        hour12: false,
+      }),
+      10
+    )
 
     if (istHours < 9 || istHours >= 13) {
       console.log('[cron-approvals] Outside approval sending window (9 AM - 1 PM IST). Current IST Hour:', istHours)
@@ -99,6 +103,16 @@ export async function GET(request: Request) {
 
         const docConfig = docTemplate?.buttons || undefined
 
+        // Fetch chatbot config to get fallback approval template settings
+        const { data: chatbotTemplate } = await db
+          .from('message_templates')
+          .select('buttons')
+          .eq('user_id', leadUserId)
+          .eq('name', '__chatbot_config')
+          .maybeSingle()
+
+        const chatbotConfig = (chatbotTemplate?.buttons as any) || {}
+
         // Generate approval PDF
         const pdfBytes = await generateCongratulationsDoc({
           name: finalName,
@@ -133,30 +147,81 @@ export async function GET(request: Request) {
         const publicUrl = publicUrlData.publicUrl
         const captionText = `Congratulations *${finalName}*! 🎉\n\nYour tower installation application for *${finalLocation}* has been officially QUALIFIED.\n\nPlease find your official Approval Letter attached above.`
 
-        // Send PDF document message on WhatsApp
-        const sentPdf = await sendDocumentMessage({
-          phoneNumberId: item.phone_number_id,
-          accessToken: item.access_token,
-          to: item.recipient_phone,
-          documentUrl: publicUrl,
-          filename: `Approval_Letter_${finalName}.pdf`,
-          caption: captionText
-        })
+        let sentMessageId: string
+        let logContentText = captionText
+        let logContentType = 'document'
+        let logMediaUrl: string | null = publicUrl
+
+        try {
+          // Send PDF document message on WhatsApp
+          const sentPdf = await sendDocumentMessage({
+            phoneNumberId: item.phone_number_id,
+            accessToken: item.access_token,
+            to: item.recipient_phone,
+            documentUrl: publicUrl,
+            filename: `Approval_Letter_${finalName}.pdf`,
+            caption: captionText
+          })
+          sentMessageId = sentPdf.messageId
+        } catch (sendErr: any) {
+          const errMsg = sendErr?.message || String(sendErr)
+          const isWindowClosed = errMsg.includes('24 hours') || errMsg.includes('window') || errMsg.includes('131047')
+
+          if (isWindowClosed && chatbotConfig.approval_template_name) {
+            console.log(`[cron-approvals] 24-hour window closed for ${item.recipient_phone}. Falling back to template: ${chatbotConfig.approval_template_name}`)
+
+            const templateLang = chatbotConfig.approval_template_lang || 'hi'
+            let components: any[] = []
+
+            if (chatbotConfig.approval_template_has_doc_header) {
+              components.push({
+                type: 'header',
+                parameters: [
+                  {
+                    type: 'document',
+                    document: {
+                      link: publicUrl,
+                      filename: `Approval_Letter_${finalName}.pdf`
+                    }
+                  }
+                ]
+              })
+            }
+
+            const sentTemplate = await sendTemplateMessage({
+              phoneNumberId: item.phone_number_id,
+              accessToken: item.access_token,
+              to: item.recipient_phone,
+              templateName: chatbotConfig.approval_template_name,
+              language: templateLang,
+              components: components.length > 0 ? components : undefined
+            })
+
+            sentMessageId = sentTemplate.messageId
+            logContentText = `[Template Fallback: ${chatbotConfig.approval_template_name}] Approval Letter`
+            logContentType = chatbotConfig.approval_template_has_doc_header ? 'document' : 'text'
+            if (!chatbotConfig.approval_template_has_doc_header) {
+              logMediaUrl = null
+            }
+          } else {
+            throw sendErr
+          }
+        }
 
         // Insert document message log
         if (item.conversation_id) {
           await db.from('messages').insert({
             conversation_id: item.conversation_id,
             sender_type: 'agent',
-            content_type: 'document',
-            content_text: captionText,
-            media_url: publicUrl,
-            message_id: sentPdf.messageId,
+            content_type: logContentType,
+            content_text: logContentText,
+            media_url: logMediaUrl,
+            message_id: sentMessageId,
             status: 'sent'
           })
 
           await db.from('conversations').update({
-            last_message_text: "Sent Approval PDF",
+            last_message_text: logContentType === 'document' ? "Sent Approval PDF" : "Sent Approval Template",
             last_message_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }).eq('id', item.conversation_id)

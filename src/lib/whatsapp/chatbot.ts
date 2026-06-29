@@ -665,9 +665,9 @@ export async function processChatbot(input: ChatbotProcessInput): Promise<boolea
       try {
         console.log('[chatbot] Scheduling Approval PDF generation for next day.');
         const scheduledAt = new Date();
-        // Set to next day 9:00 AM
+        // Set to next day 9:00 AM IST (3:30 AM UTC)
         scheduledAt.setDate(scheduledAt.getDate() + 1);
-        scheduledAt.setHours(9, 0, 0, 0);
+        scheduledAt.setUTCHours(3, 30, 0, 0);
 
         // Insert a task into a new table `approval_queue`
         await db.from('approval_queue').insert({
