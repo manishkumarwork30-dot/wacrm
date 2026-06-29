@@ -68,6 +68,7 @@ export async function GET(request: Request) {
     }
 
     // 3. Query all pending approvals scheduled in the past
+    const now = new Date()
     const { data: queueItems, error: queueError } = await db
       .from('approval_queue')
       .select('*, tower_leads!inner(user_id)')
