@@ -12,8 +12,6 @@ import {
   Loader2, 
   ShieldCheck, 
   User as UserIcon,
-  Phone,
-  Mail,
   Plus,
   Save,
   Trash2,
@@ -58,7 +56,6 @@ export default function IDCardPage() {
   // Layout & Theme states
   const [orientation, setOrientation] = useState<"vertical" | "horizontal">("vertical");
   const [selectedTheme, setSelectedTheme] = useState(THEMES[0]);
-  const [isFlipped, setIsFlipped] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Fetch cards on mount
@@ -659,233 +656,142 @@ export default function IDCardPage() {
 
         {/* Right Preview Panel */}
         <div className="lg:col-span-6 xl:col-span-5 flex flex-col items-center gap-6 justify-center">
-          <div className="flex items-center justify-between w-full max-w-[280px]">
+          <div className="flex items-center justify-center w-full max-w-[280px]">
             <span className="text-xs font-semibold text-slate-400">LIVE PREVIEW</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="text-slate-300 hover:text-white hover:bg-slate-800/50 text-xs gap-1.5 h-8"
-            >
-              <RefreshCw className="h-3 w-3" />
-              Flip to {isFlipped ? "Back" : "Front"}
-            </Button>
           </div>
 
           {/* Interactive Card Container */}
           <div className="perspective-1000 w-full flex justify-center py-4">
             <div
-              onClick={() => setIsFlipped(!isFlipped)}
-              className={`relative cursor-pointer transition-transform duration-700 transform-style-3d ${
+              className={`relative rounded-xl border border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl text-black ${
                 orientation === "vertical" 
                   ? "w-[245px] h-[385px]" 
                   : "w-[385px] h-[245px]"
-              } ${isFlipped ? "rotate-y-180" : ""}`}
+              }`}
             >
               {/* FRONT SIDE (Exact screenshot matching) */}
-              <div 
-                className={`absolute inset-0 backface-hidden rounded-xl border border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl text-black`}
-              >
-                {/* Header: Logo top left - MADE BIGGER */}
-                <div className="relative w-full px-4 pt-3 pb-1 shrink-0 flex items-center justify-between">
-                  {logoUrl ? (
-                    <img 
-                      src={logoUrl} 
-                      alt="Logo" 
-                      className="h-9 object-contain self-start mt-0.5" 
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="w-10" />
-                  )}
-                  <div className="w-1" />
-                </div>
+              {/* Header: Logo top left - MADE BIGGER */}
+              <div className="relative w-full px-4 pt-3 pb-1 shrink-0 flex items-center justify-between">
+                {logoUrl ? (
+                  <img 
+                    src={logoUrl} 
+                    alt="Logo" 
+                    className="h-9 object-contain self-start mt-0.5" 
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-10" />
+                )}
+                <div className="w-1" />
+              </div>
 
-                {/* Company name - BOLDER font weight and increased size */}
-                <div className="text-center font-black text-base tracking-widest mt-1" style={{ color: selectedTheme.value }}>
-                  {companyName.toUpperCase()}
-                </div>
+              {/* Company name - BOLDER font weight and increased size */}
+              <div className="text-center font-black text-base tracking-widest mt-1" style={{ color: selectedTheme.value }}>
+                {companyName.toUpperCase()}
+              </div>
 
-                {/* Profile Photo */}
-                <div className="flex-1 flex flex-col p-3 justify-start items-center text-center space-y-2">
-                  {orientation === "vertical" ? (
-                    <>
-                      {/* Photo frame */}
-                      <div 
-                        className="w-[90px] h-[90px] rounded-lg border-4 overflow-hidden flex items-center justify-center bg-slate-100 shadow-md"
-                        style={{ borderColor: selectedTheme.value }}
-                      >
-                        {photoBase64 ? (
-                          <img src={photoBase64} alt="Agent" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center text-slate-400">
-                            <UserIcon className="w-12 h-12" />
-                          </div>
-                        )}
+              {/* Profile Photo */}
+              <div className="flex-1 flex flex-col p-3 justify-start items-center text-center space-y-2">
+                {orientation === "vertical" ? (
+                  <>
+                    {/* Photo frame */}
+                    <div 
+                      className="w-[90px] h-[90px] rounded-lg border-4 overflow-hidden flex items-center justify-center bg-slate-100 shadow-md"
+                      style={{ borderColor: selectedTheme.value }}
+                    >
+                      {photoBase64 ? (
+                        <img src={photoBase64} alt="Agent" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400">
+                          <UserIcon className="w-12 h-12" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className="text-sm font-extrabold tracking-wide uppercase mt-1" style={{ color: selectedTheme.value }}>
+                      {name}
+                    </div>
+
+                    {/* Aadhar */}
+                    <div className="text-[9px] font-extrabold text-black tracking-wide -mt-1 uppercase">
+                      AADHAR NO - {formatAadharPreview(aadharNo)}
+                    </div>
+
+                    {/* Designation */}
+                    <div className="text-xs font-black tracking-wider uppercase" style={{ color: selectedTheme.value }}>
+                      {designation}
+                    </div>
+
+                    {/* Info details */}
+                    <div className="text-[9.5px] font-black text-black space-y-0.5 tracking-wide">
+                      <div>ID NO :- {idNumber}</div>
+                      <div>PHONE NO :- {phone}</div>
+                      <div>E-MAIL :- {email}</div>
+                    </div>
+
+                    {/* Barcode preview */}
+                    <div className="w-[180px] h-8 mt-1 shrink-0">
+                      {renderHTMLBarcode()}
+                    </div>
+
+                    {/* Validity */}
+                    <div className="text-[9px] font-extrabold text-black tracking-wide uppercase mt-1">
+                      VALID UPTO :- {validUpto}
+                    </div>
+                  </>
+                ) : (
+                  /* Horizontal Preview */
+                  <div className="flex w-full h-full gap-4 items-center justify-start text-left">
+                    {/* Left: Photo Frame */}
+                    <div 
+                      className="w-[90px] h-[90px] rounded-lg border-4 overflow-hidden flex items-center justify-center bg-slate-100 shadow-md shrink-0"
+                      style={{ borderColor: selectedTheme.value }}
+                    >
+                      {photoBase64 ? (
+                        <img src={photoBase64} alt="Agent" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400">
+                          <UserIcon className="w-12 h-12" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Details */}
+                    <div className="flex-1 flex flex-col justify-between py-0.5 h-full max-w-[240px]">
+                      <div>
+                        <div className="text-sm font-extrabold tracking-wide uppercase" style={{ color: selectedTheme.value }}>{name}</div>
+                        <div className="text-[9px] font-extrabold text-black uppercase -mt-0.5">AADHAR NO - {formatAadharPreview(aadharNo)}</div>
+                        <div className="text-xxs font-black tracking-wider uppercase mt-0.5" style={{ color: selectedTheme.value }}>{designation}</div>
                       </div>
 
-                      {/* Name */}
-                      <div className="text-sm font-extrabold tracking-wide uppercase mt-1" style={{ color: selectedTheme.value }}>
-                        {name}
-                      </div>
-
-                      {/* Aadhar */}
-                      <div className="text-[9px] font-extrabold text-black tracking-wide -mt-1 uppercase">
-                        AADHAR NO - {formatAadharPreview(aadharNo)}
-                      </div>
-
-                      {/* Designation */}
-                      <div className="text-xs font-black tracking-wider uppercase" style={{ color: selectedTheme.value }}>
-                        {designation}
-                      </div>
-
-                      {/* Info details */}
-                      <div className="text-[9.5px] font-black text-black space-y-0.5 tracking-wide">
+                      <div className="text-[8.5px] font-black text-black space-y-0.5 leading-tight">
                         <div>ID NO :- {idNumber}</div>
                         <div>PHONE NO :- {phone}</div>
                         <div>E-MAIL :- {email}</div>
                       </div>
 
-                      {/* Barcode preview */}
-                      <div className="w-[180px] h-8 mt-1 shrink-0">
-                        {renderHTMLBarcode()}
-                      </div>
-
-                      {/* Validity */}
-                      <div className="text-[9px] font-extrabold text-black tracking-wide uppercase mt-1">
-                        VALID UPTO :- {validUpto}
-                      </div>
-                    </>
-                  ) : (
-                    /* Horizontal Preview */
-                    <div className="flex w-full h-full gap-4 items-center justify-start text-left">
-                      {/* Left: Photo Frame */}
-                      <div 
-                        className="w-[90px] h-[90px] rounded-lg border-4 overflow-hidden flex items-center justify-center bg-slate-100 shadow-md shrink-0"
-                        style={{ borderColor: selectedTheme.value }}
-                      >
-                        {photoBase64 ? (
-                          <img src={photoBase64} alt="Agent" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center text-slate-400">
-                            <UserIcon className="w-12 h-12" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Right: Details */}
-                      <div className="flex-1 flex flex-col justify-between py-0.5 h-full max-w-[240px]">
-                        <div>
-                          <div className="text-sm font-extrabold tracking-wide uppercase" style={{ color: selectedTheme.value }}>{name}</div>
-                          <div className="text-[9px] font-extrabold text-black uppercase -mt-0.5">AADHAR NO - {formatAadharPreview(aadharNo)}</div>
-                          <div className="text-xxs font-black tracking-wider uppercase mt-0.5" style={{ color: selectedTheme.value }}>{designation}</div>
-                        </div>
-
-                        <div className="text-[8.5px] font-black text-black space-y-0.5 leading-tight">
-                          <div>ID NO :- {idNumber}</div>
-                          <div>PHONE NO :- {phone}</div>
-                          <div>E-MAIL :- {email}</div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="w-[100px] h-6 shrink-0">{renderHTMLBarcode()}</div>
-                          <div className="text-[7.5px] font-extrabold text-black uppercase">VALID UPTO :- {validUpto}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Double bottom wavy curves - LIGHT BLUE ON TOP, DARK BLUE ON BOTTOM */}
-                <div className="relative w-full h-8 overflow-hidden mt-auto shrink-0 bg-transparent">
-                  {/* Curve 1 (Light Blue, higher top path) */}
-                  <svg className="absolute bottom-0 left-0 w-full h-full translate-y-[2px]" viewBox="0 0 245 32" preserveAspectRatio="none">
-                    <path d="M 0 14 Q 105 0 245 15 L 245 32 L 0 32 Z" fill="#3b82f6" />
-                  </svg>
-                  {/* Curve 2 (Dark Blue, overlapping foreground path) */}
-                  <svg className="absolute bottom-0 left-0 w-full h-full translate-y-[2px]" viewBox="0 0 245 32" preserveAspectRatio="none">
-                    <path d="M 0 20 Q 115 6 245 21 L 245 32 L 0 32 Z" fill="#1e40af" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* BACK SIDE */}
-              <div 
-                className={`absolute inset-0 backface-hidden rotate-y-180 rounded-xl border border-slate-800 bg-slate-950 flex flex-col overflow-hidden shadow-2xl p-4 text-white`}
-              >
-                <div className="w-full h-[3px] rounded shrink-0 mb-3" style={{ backgroundColor: selectedTheme.value }} />
-
-                <div className="text-center font-extrabold text-[10px] tracking-wider mb-2" style={{ color: selectedTheme.value }}>
-                  TERMS & CONDITIONS
-                </div>
-
-                {orientation === "vertical" ? (
-                  <div className="flex-1 flex flex-col justify-between items-center text-[8.5px] text-slate-400 text-left">
-                    <div className="space-y-1.5 font-medium leading-relaxed px-1">
-                      <div>1. This card is non-transferable and remains the property of {companyName}.</div>
-                      <div>2. Any unauthorized use or copying is prohibited.</div>
-                      <div>3. Return immediately to the company office if found.</div>
-                    </div>
-
-                    <div className="w-full text-center space-y-1 bg-slate-900/40 rounded p-2 border border-slate-800/30">
-                      <div className="text-[8px] text-slate-300 font-semibold truncate">
-                        Email: {email}
-                      </div>
-                      <div className="text-[8px] text-slate-300 font-semibold">
-                        Phone: {phone}
-                      </div>
-                    </div>
-
-                    <div className="w-full text-center mt-3">
-                      <div className="flex h-7 justify-center items-stretch bg-transparent px-2 mt-1">
-                        {renderHTMLBarcode()}
-                      </div>
-                      <div className="text-[8px] font-mono text-slate-400 tracking-widest mt-1">{idNumber}</div>
-                    </div>
-
-                    <div className="w-full flex flex-col items-center mt-3 shrink-0">
-                      <div className="w-[120px] h-[0.5px] bg-slate-800" />
-                      <div className="text-[7.5px] text-slate-500 mt-1 font-semibold">Authorized Signatory</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex gap-4 justify-between items-stretch text-[8.5px] text-slate-400 text-left">
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div className="space-y-1.5 font-medium leading-relaxed">
-                        <div>• Property of {companyName}.</div>
-                        <div>• Unauthorized copy is prohibited.</div>
-                        <div>• If found, return to office.</div>
-                      </div>
-
-                      <div className="space-y-1 mt-2">
-                        <div className="text-[7.5px] text-slate-300 font-semibold truncate">Email: {email}</div>
-                        <div className="text-[7.5px] text-slate-300 font-semibold">Phone: {phone}</div>
-                      </div>
-                    </div>
-
-                    <div className="w-[120px] shrink-0 flex flex-col justify-between items-center border-l border-slate-900 pl-4 py-1">
-                      <div className="w-full text-center">
-                        {renderHTMLBarcode()}
-                        <div className="text-[7.5px] font-mono text-slate-400 tracking-widest mt-1 truncate">{idNumber}</div>
-                      </div>
-
-                      <div className="w-full flex flex-col items-center shrink-0">
-                        <div className="w-full h-[0.5px] bg-slate-800" />
-                        <div className="text-[7.5px] text-slate-500 mt-1 font-semibold">Authorized Signatory</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-[100px] h-6 shrink-0">{renderHTMLBarcode()}</div>
+                        <div className="text-[7.5px] font-extrabold text-black uppercase">VALID UPTO :- {validUpto}</div>
                       </div>
                     </div>
                   </div>
                 )}
+              </div>
 
-                <div className="w-full h-[3px] rounded shrink-0 mt-auto" style={{ backgroundColor: selectedTheme.value }} />
+              {/* Double bottom wavy curves - LIGHT BLUE ON TOP, DARK BLUE ON BOTTOM */}
+              <div className="relative w-full h-8 overflow-hidden mt-auto shrink-0 bg-transparent">
+                {/* Curve 1 (Light Blue, higher top path) */}
+                <svg className="absolute bottom-0 left-0 w-full h-full translate-y-[2px]" viewBox="0 0 245 32" preserveAspectRatio="none">
+                  <path d="M 0 14 Q 105 0 245 15 L 245 32 L 0 32 Z" fill="#3b82f6" />
+                </svg>
+                {/* Curve 2 (Dark Blue, overlapping foreground path) */}
+                <svg className="absolute bottom-0 left-0 w-full h-full translate-y-[2px]" viewBox="0 0 245 32" preserveAspectRatio="none">
+                  <path d="M 0 20 Q 115 6 245 21 L 245 32 L 0 32 Z" fill="#1e40af" />
+                </svg>
               </div>
             </div>
-          </div>
-
-          <div className="bg-slate-900/30 border border-slate-800/60 rounded-lg p-3 text-center max-w-[320px]">
-            <p className="text-xxs text-slate-500 leading-normal">
-              💡 <strong>Tip:</strong> Click on the ID Card preview or the button above to flip the card and check the contact information, terms, and barcode representation.
-            </p>
           </div>
         </div>
       </div>
