@@ -24,6 +24,7 @@ import {
   Shield,
   FileText,
   Phone,
+  CreditCard,
 } from "lucide-react";
 import {
   Avatar,
@@ -60,6 +61,7 @@ const navItems: NavItem[] = [
   { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/automations", label: "Automations", icon: Zap },
   { href: "/flows", label: "Flows", icon: Workflow, beta: true },
+  { href: "/id-cards", label: "ID Cards", icon: CreditCard },
 ];
 
 const bottomNavItems = [
