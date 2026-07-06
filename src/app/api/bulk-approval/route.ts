@@ -125,48 +125,55 @@ export async function POST(request: Request) {
     // 1. Pre-warm fonts and assets cache to avoid redundant network fetch requests
     await Promise.all([getFonts(), getAssets()]);
 
-    // 2. Map rows to PDF generation promises (running in parallel)
-    const pdfPromises = rowsToProcess.map(async (row, i) => {
-      const name     = String(row[nameKey] || '').trim();
-      const district = String(row[districtKey] || '').trim();
-      const date     = row[dateKey] ? String(row[dateKey] || '').trim() : '';
+    // 2. Process rows in batches to limit concurrency (concurrency limit = 10)
+    const results: any[] = [];
+    const concurrencyLimit = 10;
+    for (let i = 0; i < rowsToProcess.length; i += concurrencyLimit) {
+      const chunk = rowsToProcess.slice(i, i + concurrencyLimit);
+      const chunkResults = await Promise.all(
+        chunk.map(async (row, idx) => {
+          const actualIndex = i + idx;
+          const name     = String(row[nameKey] || '').trim();
+          const district = String(row[districtKey] || '').trim();
+          const date     = row[dateKey] ? String(row[dateKey] || '').trim() : '';
 
-      if (!name || !district) {
-        errors.push(`Row ${i + 2}: skipped (empty name or district)`);
-        return null;
-      }
+          if (!name || !district) {
+            errors.push(`Row ${actualIndex + 2}: skipped (empty name or district)`);
+            return null;
+          }
 
-      try {
-        const pdfBytes = await generateCongratulationsDoc({
-          name,
-          location: district,
-          date: date || todayStr,
-        }, docConfig);
+          try {
+            const pdfBytes = await generateCongratulationsDoc({
+              name,
+              location: district,
+              date: date || todayStr,
+            }, docConfig);
 
-        // Format filename as "name.pdf" (lowercase/same case, clean special chars)
-        // If duplicate name exists, append counter e.g., "Manish 1.pdf", "Manish 2.pdf"
-        const cleanName = name.replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-        const baseName = cleanName || 'Approval';
-        const key = baseName.toLowerCase();
+            // Format filename as "name.pdf" (lowercase/same case, clean special chars)
+            // If duplicate name exists, append counter e.g., "Manish 1.pdf", "Manish 2.pdf"
+            const cleanName = name.replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+            const baseName = cleanName || 'Approval';
+            const key = baseName.toLowerCase();
 
-        let filename = '';
-        if (nameCount[key] === undefined) {
-          nameCount[key] = 0;
-          filename = `${baseName}.pdf`;
-        } else {
-          nameCount[key]++;
-          filename = `${baseName} ${nameCount[key]}.pdf`;
-        }
+            let filename = '';
+            if (nameCount[key] === undefined) {
+              nameCount[key] = 0;
+              filename = `${baseName}.pdf`;
+            } else {
+              nameCount[key]++;
+              filename = `${baseName} ${nameCount[key]}.pdf`;
+            }
 
-        return { filename, pdfBytes };
-      } catch (rowErr: any) {
-        console.error(`Error generating PDF for row ${i + 2} (${name}):`, rowErr);
-        errors.push(`Row ${i + 2} (${name}): ${rowErr.message}`);
-        return null;
-      }
-    });
-
-    const results = await Promise.all(pdfPromises);
+            return { filename, pdfBytes };
+          } catch (rowErr: any) {
+            console.error(`Error generating PDF for row ${actualIndex + 2} (${name}):`, rowErr);
+            errors.push(`Row ${actualIndex + 2} (${name}): ${rowErr.message}`);
+            return null;
+          }
+        })
+      );
+      results.push(...chunkResults);
+    }
 
     // 3. Add successfully generated PDFs to the ZIP
     for (const res of results) {

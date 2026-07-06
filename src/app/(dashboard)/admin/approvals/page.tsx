@@ -53,14 +53,14 @@ export default function ApprovalsPage() {
           lastPotentialName = '';
         }
       } else {
-        const cleanName = line.replace(/^(mr|ms|mrs|shri|smt)\.?\s+/i, '').trim();
+        const cleanName = line.trim();
         lastPotentialName = cleanName;
       }
     }
 
     if (parsed.length === 0 && lines.length >= 2) {
       for (let i = 0; i < lines.length - 1; i += 2) {
-        const name = lines[i].replace(/^(mr|ms|mrs|shri|smt)\.?\s+/i, '').trim();
+        const name = lines[i].trim();
         const district = lines[i+1].replace(/^(district|location|city|area|state)[\s:-]+/i, '').trim();
         if (name && district) {
           parsed.push({ name, district });

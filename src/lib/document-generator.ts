@@ -22,14 +22,23 @@ let _assetPromise: Promise<{
   p4img2: Buffer | null;
 }> | null = null;
 
-const fetchBuffer = async (url: string): Promise<Buffer | null> => {
-  try {
-    const res = await fetch(url);
-    if (res.ok) return Buffer.from(await res.arrayBuffer());
-  } catch (e) {
-    console.error(`[PDF] Failed to fetch ${url}:`, e);
+const _bufferCache = new Map<string, Promise<Buffer | null>>();
+
+const fetchBuffer = (url: string): Promise<Buffer | null> => {
+  let promise = _bufferCache.get(url);
+  if (!promise) {
+    promise = (async () => {
+      try {
+        const res = await fetch(url);
+        if (res.ok) return Buffer.from(await res.arrayBuffer());
+      } catch (e) {
+        console.error(`[PDF] Failed to fetch ${url}:`, e);
+      }
+      return null;
+    })();
+    _bufferCache.set(url, promise);
   }
-  return null;
+  return promise;
 };
 
 export const getFonts = () => {
@@ -304,7 +313,9 @@ export async function generateCongratulationsDoc(data: any, customConfig?: any):
       // Salutation
       doc.font(B).fontSize(13).text('DEAR PROSPECTIVE LANDLORD', 50, doc.y);
       doc.moveDown(0.8);
-      doc.font('Times-Bold').fontSize(15).text(`Mr. ${finalName}`, 50, doc.y);
+      const hasPrefix = /^(mr|ms|mrs|shri|smt|sh|dr)\.?\s+/i.test(finalName);
+      const displayName = hasPrefix ? finalName : `Mr. ${finalName}`;
+      doc.font('Times-Bold').fontSize(15).text(displayName, 50, doc.y);
       doc.font('Times-Bold').fontSize(15).text(`District - ${finalLocation}`, 50, doc.y);
       doc.moveDown(1.2);
 
