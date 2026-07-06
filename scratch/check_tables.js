@@ -1,0 +1,40 @@
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+const envContent = fs.readFileSync(envLocalPath, 'utf8');
+const env = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^\s*([^#=]+)\s*=\s*(.*)\s*$/);
+  if (match) {
+    const key = match[1].trim();
+    let val = match[2].trim();
+    if (val.startsWith('"') && val.endsWith('"')) {
+      val = val.slice(1, -1);
+    }
+    env[key] = val;
+  }
+});
+
+const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+
+async function check() {
+  try {
+    console.log("Checking admin_sql...");
+    const { data, error } = await supabase.rpc('admin_sql', {
+      query: "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public';"
+    });
+    if (error) {
+      console.error("RPC Error:", error);
+    } else {
+      console.log("Tables list:", data);
+    }
+  } catch (err) {
+    console.error("Execution failed:", err);
+  }
+}
+
+check();

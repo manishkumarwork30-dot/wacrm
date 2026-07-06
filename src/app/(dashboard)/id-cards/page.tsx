@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +13,16 @@ import {
   ShieldCheck, 
   User as UserIcon,
   Phone,
-  Mail
+  Mail,
+  Plus,
+  Save,
+  Trash2,
+  ListFilter
 } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 
 // Define themes
 const THEMES = [
@@ -27,7 +34,13 @@ const THEMES = [
 ];
 
 export default function IDCardPage() {
-  // Input fields state (Pre-filled with user screenshot data)
+  // Saved cards list state
+  const [savedCards, setSavedCards] = useState<any[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [isLoadingCards, setIsLoadingCards] = useState(false);
+  const [activeTab, setActiveTab] = useState<"edit" | "list">("edit");
+
+  // Input fields state (Pre-filled with default user screenshot data)
   const [name, setName] = useState("ANJU");
   const [designation, setDesignation] = useState("SERVICE PROVIDER");
   const [idNumber, setIdNumber] = useState("761788");
@@ -47,6 +60,32 @@ export default function IDCardPage() {
   const [selectedTheme, setSelectedTheme] = useState(THEMES[0]);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Fetch cards on mount
+  useEffect(() => {
+    fetchCards();
+  }, []);
+
+  const fetchCards = async () => {
+    setIsLoadingCards(true);
+    try {
+      const { data, error } = await supabase
+        .from("agent_id_cards")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      
+      if (error) throw error;
+      setSavedCards(data || []);
+    } catch (err) {
+      console.log("Supabase fetch failed, falling back to localStorage:", err);
+      const local = localStorage.getItem("htl_id_cards");
+      if (local) {
+        setSavedCards(JSON.parse(local));
+      }
+    } finally {
+      setIsLoadingCards(false);
+    }
+  };
 
   // Mask Aadhaar number logic
   const formatAadharPreview = (val: string) => {
@@ -73,6 +112,146 @@ export default function IDCardPage() {
       toast.success("Photo uploaded successfully!");
     };
     reader.readAsDataURL(file);
+  };
+
+  // Save card (Insert or Update)
+  const handleSaveCard = async () => {
+    if (!name.trim()) {
+      toast.error("Agent Name is required!");
+      return;
+    }
+
+    const cardData: any = {
+      name,
+      designation,
+      id_number: idNumber,
+      aadhar_no: aadharNo,
+      email,
+      phone,
+      valid_upto: validUpto,
+      company_name: companyName,
+      logo_url: logoUrl,
+      photo_base64: photoBase64,
+      theme_name: selectedTheme.name,
+      orientation,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      if (selectedCardId) {
+        // Update
+        const { error } = await supabase
+          .from("agent_id_cards")
+          .update(cardData)
+          .eq("id", selectedCardId);
+        
+        if (error) throw error;
+        toast.success("ID Card updated in database!");
+      } else {
+        // Insert
+        const { data, error } = await supabase
+          .from("agent_id_cards")
+          .insert([cardData])
+          .select();
+        
+        if (error) throw error;
+        if (data && data[0]) {
+          setSelectedCardId(data[0].id);
+        }
+        toast.success("New ID Card saved to database!");
+      }
+      fetchCards();
+    } catch (err) {
+      console.log("Database save failed, using localStorage fallback:", err);
+      
+      const local = localStorage.getItem("htl_id_cards");
+      let list = local ? JSON.parse(local) : [];
+
+      if (selectedCardId) {
+        // Update local list
+        list = list.map((c: any) => 
+          c.id === selectedCardId ? { ...c, ...cardData } : c
+        );
+        toast.success("ID Card updated locally!");
+      } else {
+        // Insert local list
+        const newId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+        const newCard = { id: newId, ...cardData, created_at: new Date().toISOString() };
+        list.push(newCard);
+        setSelectedCardId(newId);
+        toast.success("New ID Card saved locally!");
+      }
+      localStorage.setItem("htl_id_cards", JSON.stringify(list));
+      setSavedCards(list);
+    }
+  };
+
+  // Reset form for creating a new card
+  const handleCreateNew = () => {
+    setSelectedCardId(null);
+    setName("ANJU");
+    setDesignation("SERVICE PROVIDER");
+    setIdNumber("761788");
+    setAadharNo("XXXX XXXX 0638");
+    setEmail("HTLLIMITED.COM");
+    setPhone("9990035764");
+    setValidUpto("31 MARCH 2031");
+    setPhotoBase64("");
+    toast.info("Form reset. Ready to create a new ID card!");
+    setActiveTab("edit");
+  };
+
+  // Load a saved card into the editor
+  const handleSelectCard = (card: any) => {
+    setSelectedCardId(card.id);
+    setName(card.name);
+    setDesignation(card.designation || "");
+    setIdNumber(card.id_number || "");
+    setAadharNo(card.aadhar_no || "");
+    setEmail(card.email || "");
+    setPhone(card.phone || "");
+    setValidUpto(card.valid_upto || "");
+    setCompanyName(card.company_name || "HTL NETWORK");
+    setLogoUrl(card.logo_url || "https://htlnetwork.com/assets/images/logo.png");
+    setPhotoBase64(card.photo_base64 || "");
+    setOrientation(card.orientation || "vertical");
+    
+    const themeObj = THEMES.find(t => t.name === card.theme_name) || THEMES[0];
+    setSelectedTheme(themeObj);
+    
+    toast.success(`Loaded details for ${card.name}`);
+    setActiveTab("edit");
+  };
+
+  // Delete a saved card
+  const handleDeleteCard = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent select event
+    if (!confirm("Are you sure you want to delete this ID card?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("agent_id_cards")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+      toast.success("ID Card deleted from database!");
+      fetchCards();
+    } catch (err) {
+      console.log("Database delete failed, using localStorage fallback:", err);
+      const local = localStorage.getItem("htl_id_cards");
+      if (local) {
+        let list = JSON.parse(local);
+        list = list.filter((c: any) => c.id !== id);
+        localStorage.setItem("htl_id_cards", JSON.stringify(list));
+        setSavedCards(list);
+        toast.success("ID Card deleted locally!");
+      }
+    }
+
+    if (selectedCardId === id) {
+      handleCreateNew();
+    }
   };
 
   // Trigger PDF Generation
@@ -136,179 +315,226 @@ export default function IDCardPage() {
   return (
     <div className="flex h-full flex-col p-6 gap-6">
       {/* Header section */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          <CreditCard className="h-6 w-6 text-blue-500" />
-          ID Card Generator
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Create, customize, and generate professional ID cards matching the official layout.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <CreditCard className="h-6 w-6 text-blue-500" />
+            ID Card Manager
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Create, save, and edit multiple ID cards matching the official layout.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleCreateNew}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-9 gap-1.5"
+          >
+            <Plus className="h-4 w-4" />
+            Create New Card
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Form Panel */}
-        <div className="lg:col-span-6 xl:col-span-7 bg-slate-900/50 backdrop-blur-md rounded-xl border border-slate-800 p-6 space-y-6">
-          <h2 className="text-base font-semibold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-            Cardholder Details
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="agentName" className="text-slate-300">Agent Name</Label>
-              <Input 
-                id="agentName" 
-                value={name} 
-                onChange={(e) => setName(e.target.value.toUpperCase())} 
-                placeholder="ANJU"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="designation" className="text-slate-300">Designation</Label>
-              <Input 
-                id="designation" 
-                value={designation} 
-                onChange={(e) => setDesignation(e.target.value.toUpperCase())} 
-                placeholder="SERVICE PROVIDER"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="idNumber" className="text-slate-300">ID Number</Label>
-              <Input 
-                id="idNumber" 
-                value={idNumber} 
-                onChange={(e) => setIdNumber(e.target.value)} 
-                placeholder="761788"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="aadharNo" className="text-slate-300">Aadhaar Number</Label>
-              <Input 
-                id="aadharNo" 
-                value={aadharNo} 
-                onChange={(e) => setAadharNo(e.target.value)} 
-                placeholder="XXXX XXXX 0638"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-300">Email ID</Label>
-              <Input 
-                id="email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value.toUpperCase())} 
-                placeholder="HTLLIMITED.COM"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-slate-300">Phone Number</Label>
-              <Input 
-                id="phone" 
-                value={phone} 
-                onChange={(e) => setPhone(e.target.value)} 
-                placeholder="9990035764"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="validUpto" className="text-slate-300">Valid Upto</Label>
-              <Input 
-                id="validUpto" 
-                value={validUpto} 
-                onChange={(e) => setValidUpto(e.target.value.toUpperCase())} 
-                placeholder="31 MARCH 2031"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="companyName" className="text-slate-300">Company Name</Label>
-              <Input 
-                id="companyName" 
-                value={companyName} 
-                onChange={(e) => setCompanyName(e.target.value)} 
-                placeholder="HTL NETWORK"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
+        {/* Left Form/Management Panel */}
+        <div className="lg:col-span-6 xl:col-span-7 space-y-6">
+          
+          {/* Tab Selection */}
+          <div className="flex rounded-lg bg-slate-900 p-1 border border-slate-800">
+            <button
+              onClick={() => setActiveTab("edit")}
+              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                activeTab === "edit"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {selectedCardId ? "Edit ID Card" : "Card Details"}
+            </button>
+            <button
+              onClick={() => setActiveTab("list")}
+              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                activeTab === "list"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <ListFilter className="h-3.5 w-3.5" />
+              Saved Cards List ({savedCards.length})
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-slate-300">Agent Photo</Label>
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs h-9 px-3 gap-2 flex-1"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  Upload Photo
-                </Button>
-                {photoBase64 && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setPhotoBase64("")}
-                    className="text-xs h-9 px-3 shrink-0"
-                  >
-                    Clear
-                  </Button>
+          {activeTab === "edit" ? (
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-xl border border-slate-800 p-6 space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                  Cardholder Form
+                </h2>
+                {selectedCardId && (
+                  <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-mono">
+                    Editing Mode
+                  </span>
                 )}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handlePhotoUpload} 
-                  accept="image/*" 
-                  className="hidden" 
-                />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="logoUrl" className="text-slate-300">Company Logo URL</Label>
-              <Input 
-                id="logoUrl" 
-                value={logoUrl} 
-                onChange={(e) => setLogoUrl(e.target.value)} 
-                placeholder="Logo URL"
-                className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="agentName" className="text-slate-300">Agent Name</Label>
+                  <Input 
+                    id="agentName" 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value.toUpperCase())} 
+                    placeholder="ANJU"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
 
-          {/* Configuration Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/80">
-            <div className="space-y-2">
-              <Label className="text-slate-300">Card Layout</Label>
-              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setOrientation("vertical")}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    orientation === "vertical"
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Vertical
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOrientation("horizontal")}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    orientation === "horizontal"
+                <div className="space-y-2">
+                  <Label htmlFor="designation" className="text-slate-300">Designation</Label>
+                  <Input 
+                    id="designation" 
+                    value={designation} 
+                    onChange={(e) => setDesignation(e.target.value.toUpperCase())} 
+                    placeholder="SERVICE PROVIDER"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="idNumber" className="text-slate-300">ID Number</Label>
+                  <Input 
+                    id="idNumber" 
+                    value={idNumber} 
+                    onChange={(e) => setIdNumber(e.target.value)} 
+                    placeholder="761788"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="aadharNo" className="text-slate-300">Aadhaar Number</Label>
+                  <Input 
+                    id="aadharNo" 
+                    value={aadharNo} 
+                    onChange={(e) => setAadharNo(e.target.value)} 
+                    placeholder="XXXX XXXX 0638"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-slate-300">Email ID</Label>
+                  <Input 
+                    id="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value.toUpperCase())} 
+                    placeholder="HTLLIMITED.COM"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-slate-300">Phone Number</Label>
+                  <Input 
+                    id="phone" 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value)} 
+                    placeholder="9990035764"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="validUpto" className="text-slate-300">Valid Upto</Label>
+                  <Input 
+                    id="validUpto" 
+                    value={validUpto} 
+                    onChange={(e) => setValidUpto(e.target.value.toUpperCase())} 
+                    placeholder="31 MARCH 2031"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyName" className="text-slate-300">Company Name</Label>
+                  <Input 
+                    id="companyName" 
+                    value={companyName} 
+                    onChange={(e) => setCompanyName(e.target.value)} 
+                    placeholder="HTL NETWORK"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-300">Agent Photo</Label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs h-9 px-3 gap-2 flex-1"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Upload Photo
+                    </Button>
+                    {photoBase64 && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => setPhotoBase64("")}
+                        className="text-xs h-9 px-3 shrink-0"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handlePhotoUpload} 
+                      accept="image/*" 
+                      className="hidden" 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="logoUrl" className="text-slate-300">Company Logo URL</Label>
+                  <Input 
+                    id="logoUrl" 
+                    value={logoUrl} 
+                    onChange={(e) => setLogoUrl(e.target.value)} 
+                    placeholder="Logo URL"
+                    className="bg-slate-950 border-slate-800 text-white placeholder-slate-600"
+                  />
+                </div>
+              </div>
+
+              {/* Layout Config */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/80">
+                <div className="space-y-2">
+                  <Label className="text-slate-300">Card Layout</Label>
+                  <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setOrientation("vertical")}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        orientation === "vertical"
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Vertical
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOrientation("horizontal")}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        orientation === "horizontal"
                       ? "bg-blue-600 text-white"
                       : "text-slate-400 hover:text-white"
                   }`}
@@ -339,25 +565,96 @@ export default function IDCardPage() {
             </div>
           </div>
 
-          <div className="pt-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
+            <Button
+              onClick={handleSaveCard}
+              className="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-medium gap-2 h-11"
+            >
+              <Save className="h-4 w-4 text-emerald-400" />
+              Save ID Card Details
+            </Button>
             <Button
               onClick={handleGeneratePDF}
               disabled={isGenerating}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium gap-2 h-11"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium gap-2 h-11"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating ID Card PDF...
+                  Generating PDF...
                 </>
               ) : (
                 <>
                   <Download className="h-4 w-4" />
-                  Generate & Download print-ready PDF
+                  Download PDF Card
                 </>
               )}
             </Button>
           </div>
+        </div>
+          ) : (
+            /* Saved Cards List */
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-xl border border-slate-800 p-6 space-y-4">
+              <h2 className="text-base font-semibold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+                <ListFilter className="h-4 w-4 text-blue-400" />
+                Saved ID Cards
+              </h2>
+
+              {isLoadingCards ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <span>Loading cards...</span>
+                </div>
+              ) : savedCards.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-sm">
+                  No saved ID cards found. Start filling the details and click "Save ID Card Details" above!
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[420px] overflow-y-auto pr-1">
+                  {savedCards.map((card) => (
+                    <div
+                      key={card.id}
+                      onClick={() => handleSelectCard(card)}
+                      className={`p-3.5 rounded-lg border text-left cursor-pointer transition-all duration-200 flex justify-between items-center group ${
+                        selectedCardId === card.id
+                          ? "bg-blue-500/10 border-blue-500"
+                          : "bg-slate-950/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-950/80"
+                      }`}
+                    >
+                      <div className="truncate pr-2">
+                        <div className="text-xs font-bold text-white truncate">{card.name}</div>
+                        <div className="text-[10px] text-slate-400 truncate mt-0.5">{card.designation || "No Designation"}</div>
+                        <div className="text-[9px] text-slate-500 font-mono mt-1">ID: {card.id_number || "N/A"}</div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectCard(card);
+                          }}
+                          className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                          title="Load & Edit"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => handleDeleteCard(card.id, e)}
+                          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          title="Delete Card"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Preview Panel */}
@@ -371,7 +668,7 @@ export default function IDCardPage() {
               className="text-slate-300 hover:text-white hover:bg-slate-800/50 text-xs gap-1.5 h-8"
             >
               <RefreshCw className="h-3 w-3" />
-              Flip to {isFlipped ? "Back" : "Front"}
+              Flip to {isFlipped ? "Front" : "Back"}
             </Button>
           </div>
 
@@ -389,7 +686,7 @@ export default function IDCardPage() {
               <div 
                 className={`absolute inset-0 backface-hidden rounded-xl border border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl text-black`}
               >
-                {/* Header: Logo top left, Title centered */}
+                {/* Header: Logo top left */}
                 <div className="relative w-full px-4 pt-3 pb-1 shrink-0 flex items-center justify-between">
                   {logoUrl ? (
                     <img 
@@ -401,7 +698,7 @@ export default function IDCardPage() {
                   ) : (
                     <div className="w-10" />
                   )}
-                  <span className="text-xxs font-extrabold tracking-widest text-slate-400 uppercase">OFFICIAL</span>
+                  <div className="w-1" />
                 </div>
 
                 <div className="text-center font-extrabold text-sm tracking-wide -mt-1" style={{ color: selectedTheme.value }}>
@@ -540,7 +837,6 @@ export default function IDCardPage() {
 
                     <div className="w-full text-center mt-3">
                       <div className="flex h-7 justify-center items-stretch bg-transparent px-2 mt-1">
-                        {/* Render white barcode lines on dark bg */}
                         {renderHTMLBarcode()}
                       </div>
                       <div className="text-[8px] font-mono text-slate-400 tracking-widest mt-1">{idNumber}</div>
