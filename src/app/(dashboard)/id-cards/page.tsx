@@ -668,7 +668,7 @@ export default function IDCardPage() {
               className="text-slate-300 hover:text-white hover:bg-slate-800/50 text-xs gap-1.5 h-8"
             >
               <RefreshCw className="h-3 w-3" />
-              Flip to {isFlipped ? "Front" : "Back"}
+              Flip to {isFlipped ? "Back" : "Front"}
             </Button>
           </div>
 
@@ -686,13 +686,13 @@ export default function IDCardPage() {
               <div 
                 className={`absolute inset-0 backface-hidden rounded-xl border border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl text-black`}
               >
-                {/* Header: Logo top left */}
+                {/* Header: Logo top left - MADE BIGGER */}
                 <div className="relative w-full px-4 pt-3 pb-1 shrink-0 flex items-center justify-between">
                   {logoUrl ? (
                     <img 
                       src={logoUrl} 
                       alt="Logo" 
-                      className="h-6 object-contain self-start mt-0.5" 
+                      className="h-9 object-contain self-start mt-0.5" 
                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   ) : (
@@ -701,7 +701,8 @@ export default function IDCardPage() {
                   <div className="w-1" />
                 </div>
 
-                <div className="text-center font-extrabold text-sm tracking-wide -mt-1" style={{ color: selectedTheme.value }}>
+                {/* Company name - BOLDER font weight and increased size */}
+                <div className="text-center font-black text-base tracking-widest mt-1" style={{ color: selectedTheme.value }}>
                   {companyName.toUpperCase()}
                 </div>
 
@@ -795,15 +796,15 @@ export default function IDCardPage() {
                   )}
                 </div>
 
-                {/* Double bottom wavy curves (matching image) */}
+                {/* Double bottom wavy curves - LIGHT BLUE ON TOP, DARK BLUE ON BOTTOM */}
                 <div className="relative w-full h-8 overflow-hidden mt-auto shrink-0 bg-transparent">
-                  {/* Curve 1 */}
+                  {/* Curve 1 (Light Blue, higher top path) */}
                   <svg className="absolute bottom-0 left-0 w-full h-full translate-y-[2px]" viewBox="0 0 245 32" preserveAspectRatio="none">
-                    <path d="M 0 16 Q 100 2 245 18 L 245 32 L 0 32 Z" fill="#1e40af" />
+                    <path d="M 0 14 Q 105 0 245 15 L 245 32 L 0 32 Z" fill="#3b82f6" />
                   </svg>
-                  {/* Curve 2 */}
+                  {/* Curve 2 (Dark Blue, overlapping foreground path) */}
                   <svg className="absolute bottom-0 left-0 w-full h-full translate-y-[2px]" viewBox="0 0 245 32" preserveAspectRatio="none">
-                    <path d="M 0 24 Q 110 8 245 22 L 245 32 L 0 32 Z" fill="#3b82f6" />
+                    <path d="M 0 20 Q 115 6 245 21 L 245 32 L 0 32 Z" fill="#1e40af" />
                   </svg>
                 </div>
               </div>

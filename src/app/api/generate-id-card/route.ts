@@ -109,42 +109,36 @@ export async function POST(request: Request) {
     
     // Background card border & base
     doc.rect(0, 0, cardWidth, cardHeight).fillColor('#ffffff').fill();
-    
-    // Background subtle watermark design (light gray grid or waves)
     doc.rect(0, 0, cardWidth, cardHeight).strokeColor('#f1f5f9').lineWidth(1.5).stroke();
 
-    // Top Header Section
     if (orientation === 'vertical') {
       // ── Vertical Front Side Layout (Matches Screenshot Exactly) ──
       
-      // Top Left Logo
+      // Top Left Logo - Made BIG
       if (logoBuffer) {
         try {
-          doc.image(logoBuffer, 8, 8, { width: 34, height: 16 });
+          doc.image(logoBuffer, 8, 8, { width: 44, height: 20 });
         } catch {
-          // Draw plain text fallback logo
-          doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(5).text('HTL', 8, 8);
+          doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7).text('HTL', 8, 8);
         }
       }
 
-      // "HTL NETWORK" text centered
-      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(9)
-         .text(companyName.toUpperCase(), 0, 26, { align: 'center', width: cardWidth });
+      // "HTL NETWORK" text centered - Font size increased & bold weight emphasized
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(11)
+         .text(companyName.toUpperCase(), 0, 30, { align: 'center', width: cardWidth });
 
       // Profile Photo Frame
       const photoSize = 54;
       const photoX = (cardWidth - photoSize) / 2;
-      const photoY = 38;
+      const photoY = 44; // Adjusted due to larger logo/header spacing
 
       if (photoBuffer) {
         try {
           doc.save();
-          // Clip to rounded rect
           doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).clip();
           doc.image(photoBuffer, photoX, photoY, { width: photoSize, height: photoSize });
           doc.restore();
         } catch {
-          // Fallback gray box
           doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).fillColor('#cbd5e1').fill();
           doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0).toUpperCase(), photoX, photoY + 18, { align: 'center', width: photoSize });
         }
@@ -158,70 +152,71 @@ export async function POST(request: Request) {
 
       // Agent Name (Bold, Blue, Uppercase)
       doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(8.5)
-         .text(name.toUpperCase(), 0, 98, { align: 'center', width: cardWidth });
+         .text(name.toUpperCase(), 0, 102, { align: 'center', width: cardWidth });
 
       // Aadhar No (Bold, Black, Uppercase)
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(6)
-         .text(displayAadhar, 0, 109, { align: 'center', width: cardWidth });
+         .text(displayAadhar, 0, 112, { align: 'center', width: cardWidth });
 
       // Designation (Bold, Blue, Uppercase)
       doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7.5)
-         .text(designation.toUpperCase(), 0, 118, { align: 'center', width: cardWidth });
+         .text(designation.toUpperCase(), 0, 120, { align: 'center', width: cardWidth });
 
       // Info Fields (Bold, Black)
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(6);
-      doc.text(`ID NO :- ${idNumber}`, 0, 129, { align: 'center', width: cardWidth });
-      doc.text(`PHONE NO :- ${phone}`, 0, 137, { align: 'center', width: cardWidth });
-      doc.text(`E-MAIL :- ${email.toUpperCase()}`, 0, 145, { align: 'center', width: cardWidth });
+      doc.text(`ID NO :- ${idNumber}`, 0, 130, { align: 'center', width: cardWidth });
+      doc.text(`PHONE NO :- ${phone}`, 0, 138, { align: 'center', width: cardWidth });
+      doc.text(`E-MAIL :- ${email.toUpperCase()}`, 0, 146, { align: 'center', width: cardWidth });
 
       // Barcode
       const barcodeWidth = 120;
       const barcodeHeight = 18;
       const barcodeX = (cardWidth - barcodeWidth) / 2;
-      const barcodeY = 154;
+      const barcodeY = 155;
       drawBarcode(doc, barcodeX, barcodeY, barcodeWidth, barcodeHeight, idNumber);
 
       // Validity (Bold, Black)
       doc.fillColor('#000000').font('Helvetica-Bold').fontSize(6)
-         .text(`VALID UPTO :- ${validUpto.toUpperCase()}`, 0, 175, { align: 'center', width: cardWidth });
+         .text(`VALID UPTO :- ${validUpto.toUpperCase()}`, 0, 176, { align: 'center', width: cardWidth });
 
-      // Curved Blue Wave Footer at the bottom
+      // Double-layered Curved Wave Footer at the bottom (Matches image layering)
       doc.save();
-      // First darker blue wave
-      doc.fillColor('#1e40af');
-      doc.moveTo(0, cardHeight - 20)
-         .quadraticCurveTo(cardWidth * 0.4, cardHeight - 34, cardWidth * 0.8, cardHeight - 12)
-         .lineTo(cardWidth, cardHeight - 8)
+      
+      // 1. Light Blue wave background (highest)
+      doc.fillColor('#3b82f6');
+      doc.moveTo(0, cardHeight - 22)
+         .quadraticCurveTo(cardWidth * 0.5, cardHeight - 34, cardWidth, cardHeight - 16)
          .lineTo(cardWidth, cardHeight)
          .lineTo(0, cardHeight)
          .closePath()
          .fill();
 
-      // Second lighter blue wave overlay
-      doc.fillColor('#3b82f6');
-      doc.moveTo(0, cardHeight - 12)
-         .quadraticCurveTo(cardWidth * 0.5, cardHeight - 24, cardWidth, cardHeight - 4)
+      // 2. Dark Blue wave foreground (lowest, overlapping bottom part)
+      doc.fillColor('#1e40af');
+      doc.moveTo(0, cardHeight - 14)
+         .quadraticCurveTo(cardWidth * 0.5, cardHeight - 24, cardWidth, cardHeight - 10)
          .lineTo(cardWidth, cardHeight)
          .lineTo(0, cardHeight)
          .closePath()
          .fill();
+         
       doc.restore();
 
     } else {
       // ── Horizontal Front Side Layout ──
       
-      // Top Left Logo
+      // Top Left Logo - Made BIG
       if (logoBuffer) {
         try {
-          doc.image(logoBuffer, 8, 8, { width: 34, height: 16 });
+          doc.image(logoBuffer, 8, 8, { width: 44, height: 20 });
         } catch {
-          doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(5).text('HTL', 8, 8);
+          doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7).text('HTL', 8, 8);
         }
       }
 
       // "HTL NETWORK" text centered
-      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(9)
-         .text(companyName.toUpperCase(), 40, 12, { align: 'left', width: cardWidth - 48 });
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(11)
+         .text(companyName.toUpperCase(), 60, 12, { align: 'left', width: cardWidth - 68 });
 
       // Profile Photo on the Left
       const photoSize = 54;
@@ -280,16 +275,18 @@ export async function POST(request: Request) {
 
       // Curved Blue Wave Footer at the bottom right corner
       doc.save();
-      doc.fillColor('#1e40af');
-      doc.moveTo(cardWidth - 50, cardHeight)
-         .quadraticCurveTo(cardWidth - 25, cardHeight - 20, cardWidth, cardHeight - 12)
+      // Light blue wave (top)
+      doc.fillColor('#3b82f6');
+      doc.moveTo(cardWidth - 55, cardHeight)
+         .quadraticCurveTo(cardWidth - 28, cardHeight - 24, cardWidth, cardHeight - 15)
          .lineTo(cardWidth, cardHeight)
          .closePath()
          .fill();
 
-      doc.fillColor('#3b82f6');
-      doc.moveTo(cardWidth - 40, cardHeight)
-         .quadraticCurveTo(cardWidth - 15, cardHeight - 12, cardWidth, cardHeight - 6)
+      // Dark blue wave (bottom)
+      doc.fillColor('#1e40af');
+      doc.moveTo(cardWidth - 45, cardHeight)
+         .quadraticCurveTo(cardWidth - 20, cardHeight - 15, cardWidth, cardHeight - 8)
          .lineTo(cardWidth, cardHeight)
          .closePath()
          .fill();
