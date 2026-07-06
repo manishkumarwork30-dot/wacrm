@@ -23,8 +23,7 @@ async function fetchLogoBuffer(url: string): Promise<Buffer | null> {
 
 // Draw a barcode as vector rectangles in PDFKit
 function drawBarcode(doc: PDFKit.PDFDocument, x: number, y: number, width: number, height: number, code: string) {
-  // A clean, simple barcode encoding using standard patterns
-  const cleanCode = (code || 'EMPLOYEE').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cleanCode = (code || '761788').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const patternMap: Record<string, string> = {
     'A': '101001101', 'B': '101100101', 'C': '110100101', 'D': '101001011',
     'E': '110100101', 'F': '101100101', 'G': '101001101', 'H': '1101001101',
@@ -54,32 +53,28 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
     const {
-      name = 'Agent Name',
-      designation = 'Field Executive',
-      idNumber = 'HTL-2026-0001',
-      aadharNo = 'XXXX XXXX 1234',
-      email = 'agent@htlnetwork.com',
-      phone = '+91 99999 88888',
-      validUpto = '2031',
+      name = 'ANJU',
+      designation = 'SERVICE PROVIDER',
+      idNumber = '761788',
+      aadharNo = 'XXXX XXXX 0638',
+      email = 'HTLLIMITED.COM',
+      phone = '9990035764',
+      validUpto = '31 MARCH 2031',
       companyName = 'HTL NETWORK',
       logoUrl = 'https://htlnetwork.com/assets/images/logo.png',
       photoBase64 = '', // Base64 uploaded photo
-      themeColor = '#0000ff', // default blue
+      themeColor = '#113f67', // Dark Blue from card screenshot
       orientation = 'vertical' // vertical or horizontal
     } = data;
 
     // Mask Aadhaar to only show last 4 digits
     const cleanAadhar = (aadharNo || '').replace(/\s/g, '');
-    const maskedAadhar = cleanAadhar.length >= 4 
-      ? `XXXX XXXX ${cleanAadhar.substring(cleanAadhar.length - 4)}` 
-      : 'XXXX XXXX 1234';
-
-    // Format validUpto text
-    const displayValidity = `Valid Upto: ${validUpto}`;
+    const last4Digits = cleanAadhar.length >= 4 
+      ? cleanAadhar.substring(cleanAadhar.length - 4) 
+      : '0638';
+    const displayAadhar = `AADHAR NO - XXXX XXXX ${last4Digits}`;
 
     // Dimensions: Standard CR-80 card size
-    // Vertical: 54mm width (153pt) x 85.6mm height (242pt)
-    // Horizontal: 85.6mm width (242pt) x 54mm height (153pt)
     const cardWidth = orientation === 'horizontal' ? 242 : 153;
     const cardHeight = orientation === 'horizontal' ? 153 : 242;
 
@@ -114,108 +109,191 @@ export async function POST(request: Request) {
     
     // Background card border & base
     doc.rect(0, 0, cardWidth, cardHeight).fillColor('#ffffff').fill();
-    doc.rect(0, 0, cardWidth, cardHeight).strokeColor('#e2e8f0').lineWidth(2).stroke();
+    
+    // Background subtle watermark design (light gray grid or waves)
+    doc.rect(0, 0, cardWidth, cardHeight).strokeColor('#f1f5f9').lineWidth(1.5).stroke();
 
-    // Top Header Banner (Theme Color)
-    const headerHeight = orientation === 'horizontal' ? 32 : 36;
-    doc.rect(1, 1, cardWidth - 2, headerHeight).fillColor(themeColor).fill();
-
-    // Draw Company Name & Logo in Header
-    doc.fillColor('#ffffff');
-    if (logoBuffer) {
-      try {
-        const logoWidth = 24;
-        const logoHeight = 24;
-        doc.image(logoBuffer, 8, (headerHeight - logoHeight) / 2 + 1, { width: logoWidth, height: logoHeight });
-        doc.font('Helvetica-Bold').fontSize(orientation === 'horizontal' ? 10 : 8)
-           .text(companyName, 38, (headerHeight - 8) / 2 + 1, { width: cardWidth - 42, lineBreak: false });
-      } catch {
-        doc.font('Helvetica-Bold').fontSize(8).text(companyName, 8, (headerHeight - 8) / 2 + 1, { align: 'center', width: cardWidth - 16 });
-      }
-    } else {
-      doc.font('Helvetica-Bold').fontSize(8).text(companyName, 8, (headerHeight - 8) / 2 + 1, { align: 'center', width: cardWidth - 16 });
-    }
-
-    // Footer/Valid Bar (Theme Color Accent)
-    const footerHeight = 14;
-    doc.rect(1, cardHeight - footerHeight - 1, cardWidth - 2, footerHeight).fillColor(themeColor).fill();
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(6)
-       .text(displayValidity, 0, cardHeight - footerHeight + 4, { align: 'center', width: cardWidth });
-
+    // Top Header Section
     if (orientation === 'vertical') {
-      // ── Vertical Front Side Layout ──
+      // ── Vertical Front Side Layout (Matches Screenshot Exactly) ──
       
-      // Render Circular Profile Photo Frame
-      const photoSize = 48;
-      const photoX = (cardWidth - photoSize) / 2;
-      const photoY = headerHeight + 10;
+      // Top Left Logo
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, 8, 8, { width: 34, height: 16 });
+        } catch {
+          // Draw plain text fallback logo
+          doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(5).text('HTL', 8, 8);
+        }
+      }
 
-      // Outer Ring
-      doc.circle(cardWidth / 2, photoY + photoSize / 2, photoSize / 2 + 2).strokeColor(themeColor).lineWidth(1.5).stroke();
+      // "HTL NETWORK" text centered
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(9)
+         .text(companyName.toUpperCase(), 0, 26, { align: 'center', width: cardWidth });
+
+      // Profile Photo Frame
+      const photoSize = 54;
+      const photoX = (cardWidth - photoSize) / 2;
+      const photoY = 38;
 
       if (photoBuffer) {
         try {
           doc.save();
-          doc.circle(cardWidth / 2, photoY + photoSize / 2, photoSize / 2).clip();
+          // Clip to rounded rect
+          doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).clip();
           doc.image(photoBuffer, photoX, photoY, { width: photoSize, height: photoSize });
           doc.restore();
         } catch {
-          // Fallback gray circle with initials
-          doc.circle(cardWidth / 2, photoY + photoSize / 2, photoSize / 2).fillColor('#cbd5e1').fill();
-          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0), photoX, photoY + 16, { align: 'center', width: photoSize });
+          // Fallback gray box
+          doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).fillColor('#cbd5e1').fill();
+          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0).toUpperCase(), photoX, photoY + 18, { align: 'center', width: photoSize });
         }
       } else {
-        doc.circle(cardWidth / 2, photoY + photoSize / 2, photoSize / 2).fillColor('#cbd5e1').fill();
-        doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0), photoX, photoY + 16, { align: 'center', width: photoSize });
+        doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).fillColor('#cbd5e1').fill();
+        doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0).toUpperCase(), photoX, photoY + 18, { align: 'center', width: photoSize });
       }
 
-      // Name & Designation
-      const textY = photoY + photoSize + 10;
-      doc.fillColor('#1e293b').font('Helvetica-Bold').fontSize(9).text(name, 4, textY, { align: 'center', width: cardWidth - 8 });
-      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7).text(designation, 4, textY + 12, { align: 'center', width: cardWidth - 8 });
+      // Rounded rect border on top
+      doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).strokeColor(themeColor).lineWidth(2.5).stroke();
 
-      // ID and Aadhaar Info Block
-      const infoY = textY + 28;
-      doc.fillColor('#334155').font('Helvetica').fontSize(6.5);
-      doc.text(`ID No: ${idNumber}`, 10, infoY, { align: 'center', width: cardWidth - 20 });
-      doc.text(`Aadhaar: ${maskedAadhar}`, 10, infoY + 10, { align: 'center', width: cardWidth - 20 });
+      // Agent Name (Bold, Blue, Uppercase)
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(8.5)
+         .text(name.toUpperCase(), 0, 98, { align: 'center', width: cardWidth });
+
+      // Aadhar No (Bold, Black, Uppercase)
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(6)
+         .text(displayAadhar, 0, 109, { align: 'center', width: cardWidth });
+
+      // Designation (Bold, Blue, Uppercase)
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7.5)
+         .text(designation.toUpperCase(), 0, 118, { align: 'center', width: cardWidth });
+
+      // Info Fields (Bold, Black)
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(6);
+      doc.text(`ID NO :- ${idNumber}`, 0, 129, { align: 'center', width: cardWidth });
+      doc.text(`PHONE NO :- ${phone}`, 0, 137, { align: 'center', width: cardWidth });
+      doc.text(`E-MAIL :- ${email.toUpperCase()}`, 0, 145, { align: 'center', width: cardWidth });
+
+      // Barcode
+      const barcodeWidth = 120;
+      const barcodeHeight = 18;
+      const barcodeX = (cardWidth - barcodeWidth) / 2;
+      const barcodeY = 154;
+      drawBarcode(doc, barcodeX, barcodeY, barcodeWidth, barcodeHeight, idNumber);
+
+      // Validity (Bold, Black)
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(6)
+         .text(`VALID UPTO :- ${validUpto.toUpperCase()}`, 0, 175, { align: 'center', width: cardWidth });
+
+      // Curved Blue Wave Footer at the bottom
+      doc.save();
+      // First darker blue wave
+      doc.fillColor('#1e40af');
+      doc.moveTo(0, cardHeight - 20)
+         .quadraticCurveTo(cardWidth * 0.4, cardHeight - 34, cardWidth * 0.8, cardHeight - 12)
+         .lineTo(cardWidth, cardHeight - 8)
+         .lineTo(cardWidth, cardHeight)
+         .lineTo(0, cardHeight)
+         .closePath()
+         .fill();
+
+      // Second lighter blue wave overlay
+      doc.fillColor('#3b82f6');
+      doc.moveTo(0, cardHeight - 12)
+         .quadraticCurveTo(cardWidth * 0.5, cardHeight - 24, cardWidth, cardHeight - 4)
+         .lineTo(cardWidth, cardHeight)
+         .lineTo(0, cardHeight)
+         .closePath()
+         .fill();
+      doc.restore();
 
     } else {
       // ── Horizontal Front Side Layout ──
       
-      // Profile Photo on the Left
-      const photoSize = 52;
-      const photoX = 12;
-      const photoY = headerHeight + 12;
+      // Top Left Logo
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, 8, 8, { width: 34, height: 16 });
+        } catch {
+          doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(5).text('HTL', 8, 8);
+        }
+      }
 
-      doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 2).strokeColor(themeColor).lineWidth(1.5).stroke();
+      // "HTL NETWORK" text centered
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(9)
+         .text(companyName.toUpperCase(), 40, 12, { align: 'left', width: cardWidth - 48 });
+
+      // Profile Photo on the Left
+      const photoSize = 54;
+      const photoX = 12;
+      const photoY = 38;
 
       if (photoBuffer) {
         try {
           doc.save();
-          doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2).clip();
+          doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).clip();
           doc.image(photoBuffer, photoX, photoY, { width: photoSize, height: photoSize });
           doc.restore();
         } catch {
-          doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2).fillColor('#cbd5e1').fill();
-          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(16).text(name.charAt(0), photoX, photoY + 18, { align: 'center', width: photoSize });
+          doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).fillColor('#cbd5e1').fill();
+          doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0).toUpperCase(), photoX, photoY + 18, { align: 'center', width: photoSize });
         }
       } else {
-        doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2).fillColor('#cbd5e1').fill();
-        doc.fillColor('#475569').font('Helvetica-Bold').fontSize(16).text(name.charAt(0), photoX, photoY + 18, { align: 'center', width: photoSize });
+        doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).fillColor('#cbd5e1').fill();
+        doc.fillColor('#475569').font('Helvetica-Bold').fontSize(14).text(name.charAt(0).toUpperCase(), photoX, photoY + 18, { align: 'center', width: photoSize });
       }
+
+      doc.roundedRect(photoX, photoY, photoSize, photoSize, 6).strokeColor(themeColor).lineWidth(2.5).stroke();
 
       // Details on the Right
       const rightContentX = photoX + photoSize + 12;
-      const contentY = headerHeight + 10;
+      const contentY = 36;
 
-      doc.fillColor('#1e293b').font('Helvetica-Bold').fontSize(10).text(name, rightContentX, contentY, { width: cardWidth - rightContentX - 8 });
-      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7.5).text(designation, rightContentX, contentY + 13, { width: cardWidth - rightContentX - 8 });
+      // Agent Name (Bold, Blue, Uppercase)
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(9)
+         .text(name.toUpperCase(), rightContentX, contentY, { width: cardWidth - rightContentX - 8 });
 
-      // ID and Aadhaar
-      doc.fillColor('#334155').font('Helvetica').fontSize(6.5);
-      doc.text(`ID No: ${idNumber}`, rightContentX, contentY + 26);
-      doc.text(`Aadhaar: ${maskedAadhar}`, rightContentX, contentY + 36);
+      // Aadhar No (Bold, Black, Uppercase)
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(5.5)
+         .text(displayAadhar, rightContentX, contentY + 11, { width: cardWidth - rightContentX - 8 });
+
+      // Designation (Bold, Blue, Uppercase)
+      doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7.5)
+         .text(designation.toUpperCase(), rightContentX, contentY + 19, { width: cardWidth - rightContentX - 8 });
+
+      // Info Fields
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(5.5);
+      doc.text(`ID NO :- ${idNumber}`, rightContentX, contentY + 29);
+      doc.text(`PHONE NO :- ${phone}`, rightContentX, contentY + 37);
+      doc.text(`E-MAIL :- ${email.toUpperCase()}`, rightContentX, contentY + 45);
+
+      // Barcode
+      const barcodeWidth = 100;
+      const barcodeHeight = 15;
+      const barcodeX = 12;
+      const barcodeY = 102;
+      drawBarcode(doc, barcodeX, barcodeY, barcodeWidth, barcodeHeight, idNumber);
+
+      // Validity (Bold, Black)
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(5.5)
+         .text(`VALID UPTO :- ${validUpto.toUpperCase()}`, 12, 122);
+
+      // Curved Blue Wave Footer at the bottom right corner
+      doc.save();
+      doc.fillColor('#1e40af');
+      doc.moveTo(cardWidth - 50, cardHeight)
+         .quadraticCurveTo(cardWidth - 25, cardHeight - 20, cardWidth, cardHeight - 12)
+         .lineTo(cardWidth, cardHeight)
+         .closePath()
+         .fill();
+
+      doc.fillColor('#3b82f6');
+      doc.moveTo(cardWidth - 40, cardHeight)
+         .quadraticCurveTo(cardWidth - 15, cardHeight - 12, cardWidth, cardHeight - 6)
+         .lineTo(cardWidth, cardHeight)
+         .closePath()
+         .fill();
+      doc.restore();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -225,7 +303,7 @@ export async function POST(request: Request) {
 
     // Background card border & base
     doc.rect(0, 0, cardWidth, cardHeight).fillColor('#ffffff').fill();
-    doc.rect(0, 0, cardWidth, cardHeight).strokeColor('#e2e8f0').lineWidth(2).stroke();
+    doc.rect(0, 0, cardWidth, cardHeight).strokeColor('#f1f5f9').lineWidth(1.5).stroke();
 
     // Header strip
     doc.rect(1, 1, cardWidth - 2, 8).fillColor(themeColor).fill();
@@ -250,7 +328,7 @@ export async function POST(request: Request) {
       // Contact Details Block
       const backInfoY = 64;
       doc.fillColor('#334155').font('Helvetica-Bold').fontSize(5.5);
-      doc.text(`Email: ${email}`, 8, backInfoY, { align: 'center', width: cardWidth - 16 });
+      doc.text(`Email: ${email.toUpperCase()}`, 8, backInfoY, { align: 'center', width: cardWidth - 16 });
       doc.text(`Phone: ${phone}`, 8, backInfoY + 8, { align: 'center', width: cardWidth - 16 });
 
       // Barcode representing the ID
@@ -271,7 +349,7 @@ export async function POST(request: Request) {
     } else {
       // ── Horizontal Back Side Layout ──
       
-      // Title on the Left, details on the Right or vice versa
+      // Title
       doc.fillColor(themeColor).font('Helvetica-Bold').fontSize(7.5).text('TERMS & CONDITIONS', 8, 14);
       
       // Instruction terms
@@ -284,7 +362,7 @@ export async function POST(request: Request) {
 
       // Contact details
       doc.fillColor('#334155').font('Helvetica-Bold').fontSize(5.2);
-      doc.text(`Email: ${email}`, 8, 64, { width: cardWidth / 2 + 10 });
+      doc.text(`Email: ${email.toUpperCase()}`, 8, 64, { width: cardWidth / 2 + 10 });
       doc.text(`Phone: ${phone}`, 8, 72, { width: cardWidth / 2 + 10 });
 
       // Right Column: Barcode & Signature
