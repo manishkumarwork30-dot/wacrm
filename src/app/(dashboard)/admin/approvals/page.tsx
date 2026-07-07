@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -170,68 +171,159 @@ export default function ApprovalsPage() {
   };
 
   const handleBulkGenerate = async () => {
-    let parsedRows: { name: string; district: string }[] = [];
-
-    if (bulkMode === "excel") {
-      if (!bulkFile) return;
-    } else {
-      parsedRows = parseTextData(rawTextData);
-      if (parsedRows.length === 0) {
-        toast.error("No valid names/districts parsed from the pasted text.");
-        return;
-      }
-    }
+    let parsedRows: { name: string; district: string; date?: string }[] = [];
 
     setIsBulkGenerating(true);
     setBulkResult(null);
+    let runToastId = toast.loading("Preparing files...");
 
     try {
-      let response;
       if (bulkMode === "excel") {
-        const form = new FormData();
-        form.append("file", bulkFile!);
-        response = await fetch("/api/bulk-approval", {
-          method: "POST",
-          body: form,
-        });
+        if (!bulkFile) {
+          toast.error("No file selected.");
+          setIsBulkGenerating(false);
+          toast.dismiss(runToastId);
+          return;
+        }
+        
+        const arrayBuffer = await bulkFile.arrayBuffer();
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rawRows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+        
+        if (rawRows.length === 0) {
+          toast.error("The Excel file is empty.");
+          setIsBulkGenerating(false);
+          toast.dismiss(runToastId);
+          return;
+        }
+
+        const findKey = (row: Record<string, string>, ...candidates: string[]) => {
+          const keys = Object.keys(row).map(k => k.trim().toLowerCase());
+          for (const c of candidates) {
+            const idx = keys.indexOf(c.toLowerCase());
+            if (idx !== -1) return Object.keys(row)[idx];
+          }
+          return null;
+        };
+
+        const firstRow = rawRows[0];
+        const nameKey = findKey(firstRow, 'name');
+        const districtKey = findKey(firstRow, 'district', 'location', 'city', 'area');
+        const dateKey = findKey(firstRow, 'date');
+
+        if (!nameKey) {
+          toast.error('Missing "Name" column in Excel. Please add a column named "Name".');
+          setIsBulkGenerating(false);
+          toast.dismiss(runToastId);
+          return;
+        }
+        if (!districtKey) {
+          toast.error('Missing "District" (or "Location") column in Excel.');
+          setIsBulkGenerating(false);
+          toast.dismiss(runToastId);
+          return;
+        }
+
+        parsedRows = rawRows.map((r: any) => ({
+          name: String(r[nameKey] || '').trim(),
+          district: String(r[districtKey] || '').trim(),
+          date: dateKey ? String(r[dateKey] || '').trim() : undefined,
+        })).filter(r => r.name && r.district);
       } else {
-        const rowsWithDate = parsedRows.map((r) => ({
-          ...r,
-          date: textBulkDate || undefined,
-        }));
-        response = await fetch("/api/bulk-approval", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows: rowsWithDate }),
-        });
+        parsedRows = parseTextData(rawTextData);
+        if (parsedRows.length === 0) {
+          toast.error("No valid names/districts parsed from the pasted text.");
+          setIsBulkGenerating(false);
+          toast.dismiss(runToastId);
+          return;
+        }
       }
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Failed to generate approvals");
+      toast.loading(`Generating 0 / ${parsedRows.length} PDFs...`, { id: runToastId });
+
+      const zip = new JSZip();
+      let generatedCount = 0;
+      let errorCount = 0;
+      const errorsList: string[] = [];
+      const nameCount: Record<string, number> = {};
+
+      const rowsWithDate = parsedRows.map((r) => ({
+        ...r,
+        date: r.date || textBulkDate || undefined,
+      }));
+
+      // Process with concurrency limit to avoid overwhelming the server/browser
+      const concurrencyLimit = 3;
+      for (let i = 0; i < rowsWithDate.length; i += concurrencyLimit) {
+        const chunk = rowsWithDate.slice(i, i + concurrencyLimit);
+        await Promise.all(
+          chunk.map(async (row, idx) => {
+            const actualIndex = i + idx;
+            try {
+              const res = await fetch("/api/generate-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: row.name, location: row.district, date: row.date }),
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Failed to generate PDF for ${row.name}`);
+              }
+              const blob = await res.blob();
+              
+              const cleanName = row.name.replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+              const baseName = cleanName || 'Approval';
+              const key = baseName.toLowerCase();
+              let filename = '';
+              if (nameCount[key] === undefined) {
+                nameCount[key] = 0;
+                filename = `${baseName}.pdf`;
+              } else {
+                nameCount[key]++;
+                filename = `${baseName} ${nameCount[key]}.pdf`;
+              }
+              
+              zip.file(filename, blob);
+              generatedCount++;
+            } catch (err: any) {
+              console.error(`Error for row ${actualIndex + 1} (${row.name}):`, err);
+              errorCount++;
+              errorsList.push(`Row ${actualIndex + 1} (${row.name}): ${err.message}`);
+            }
+          })
+        );
+        toast.loading(`Generating ${Math.min(i + concurrencyLimit, rowsWithDate.length)} / ${rowsWithDate.length} PDFs...`, { id: runToastId });
       }
 
-      // Grab metadata from headers
-      const count  = parseInt(response.headers.get("X-Generated-Count") ?? "0", 10);
-      const errors = parseInt(response.headers.get("X-Error-Count")    ?? "0", 10);
+      if (generatedCount === 0) {
+        toast.error("No PDFs could be generated. Check your data.", { id: runToastId });
+        return;
+      }
 
-      // Download the ZIP
-      const blob     = await response.blob();
-      const today    = new Date();
-      const dateStr  = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
-      const url      = URL.createObjectURL(blob);
-      const anchor   = document.createElement("a");
-      anchor.href    = url;
+      if (errorsList.length > 0) {
+        zip.file("_errors.txt", errorsList.join("\n"));
+      }
+
+      toast.loading("Compressing ZIP file, please wait...", { id: runToastId });
+      
+      const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+      const today = new Date();
+      const dateStr = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
+      const url = URL.createObjectURL(zipBlob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
       anchor.download = `HTL_Approvals_${dateStr}.zip`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
 
-      setBulkResult({ count, errors });
-      toast.success(`✅ ${count} approval PDF${count !== 1 ? "s" : ""} downloaded as ZIP!`);
+      setBulkResult({ count: generatedCount, errors: errorCount });
+      toast.success(`✅ ${generatedCount} approval PDF${generatedCount !== 1 ? "s" : ""} downloaded as ZIP!`, { id: runToastId });
     } catch (err: any) {
-      toast.error(err.message || "Failed to generate bulk approvals");
+      toast.error(err.message || "Failed to generate bulk approvals", { id: runToastId });
     } finally {
       setIsBulkGenerating(false);
     }
