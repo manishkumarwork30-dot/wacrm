@@ -9,10 +9,10 @@ let browserClient: SupabaseClient | undefined
 export function createClient() {
   if (browserClient) return browserClient
 
-  browserClient = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bwiylhfavbntkickvrdl.supabase.co'
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_oUGSBZEfXlNdEywZmb74JQ_YpWM2lm_'
+  
+  browserClient = createBrowserClient(supabaseUrl, supabaseKey)
 
   return browserClient
 }
