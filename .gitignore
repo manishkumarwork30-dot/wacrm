@@ -48,3 +48,9 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Cloudflare / OpenNext build artifacts
+# These are generated at deploy time and MUST NOT be committed;
+# they contain absolute paths from the machine that built them.
+.open-next
+.wrangler
