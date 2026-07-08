@@ -105,11 +105,11 @@ export default function FlowRunsPage() {
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!params.id) return;
+    if (!params?.id) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/flows/${params.id}/runs`);
+        const res = await fetch(`/api/flows/${params?.id}/runs`);
         if (res.status === 404) {
           if (!cancelled) setNotFound(true);
           return;
@@ -137,7 +137,7 @@ export default function FlowRunsPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params?.id]);
 
   function toggle(runId: string) {
     setExpanded((prev) => {

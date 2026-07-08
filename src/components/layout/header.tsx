@@ -43,7 +43,7 @@ const pageTitles: Record<string, string> = {
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
   const match = Object.entries(pageTitles).find(([path]) =>
-    pathname.startsWith(path)
+    pathname?.startsWith(path)
   );
   return match ? match[1] : "Dashboard";
 }
@@ -56,25 +56,26 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const waStatus = useWhatsAppStatus();
-  const title = getPageTitle(pathname);
+  const safePathname = pathname || "";
+  const title = getPageTitle(safePathname);
   const [syncing, setSyncing] = useState(false);
 
   const getSyncLabel = () => {
-    if (pathname.startsWith("/settings")) return "Sync Templates";
-    if (pathname.startsWith("/contacts")) return "Sync Contacts";
-    if (pathname.startsWith("/leads")) return "Sync Leads";
-    if (pathname.startsWith("/broadcasts")) return "Sync Broadcasts";
-    if (pathname.startsWith("/inbox")) return "Sync Inbox";
-    if (pathname.startsWith("/pipelines")) return "Sync Pipelines";
-    if (pathname.startsWith("/automations")) return "Sync Automations";
-    if (pathname.startsWith("/flows")) return "Sync Flows";
+    if (safePathname.startsWith("/settings")) return "Sync Templates";
+    if (safePathname.startsWith("/contacts")) return "Sync Contacts";
+    if (safePathname.startsWith("/leads")) return "Sync Leads";
+    if (safePathname.startsWith("/broadcasts")) return "Sync Broadcasts";
+    if (safePathname.startsWith("/inbox")) return "Sync Inbox";
+    if (safePathname.startsWith("/pipelines")) return "Sync Pipelines";
+    if (safePathname.startsWith("/automations")) return "Sync Automations";
+    if (safePathname.startsWith("/flows")) return "Sync Flows";
     return "Sync Page";
   };
 
   const handleSync = async () => {
     setSyncing(true);
     try {
-      if (pathname.startsWith("/settings")) {
+      if (safePathname.startsWith("/settings")) {
         const res = await fetch('/api/whatsapp/templates/sync', {
           method: 'POST',
         });

@@ -30,11 +30,11 @@ export default function FlowEditorPage() {
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!params.id) return;
+    if (!params?.id) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/flows/${params.id}`);
+        const res = await fetch(`/api/flows/${params?.id}`);
         if (res.status === 404) {
           if (!cancelled) setNotFound(true);
           return;
@@ -60,7 +60,7 @@ export default function FlowEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params?.id]);
 
   if (loading) {
     return (

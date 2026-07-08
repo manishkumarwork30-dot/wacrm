@@ -13,7 +13,7 @@ import type { AutomationStepType, AutomationTriggerType } from "@/types"
 
 export default function NewAutomationPage() {
   const params = useSearchParams()
-  const template = params.get("template") as TemplateSlug | null
+  const template = params?.get("template") as TemplateSlug | null
 
   const initial: BuilderInitial = useMemo(() => {
     if (template && AUTOMATION_TEMPLATES[template]) {

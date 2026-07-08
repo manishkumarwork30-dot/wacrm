@@ -43,7 +43,7 @@ const statusConfig = {
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const jobId = params.jobId as string;
+  const jobId = params?.jobId as string;
 
   const [job, setJob] = useState<NumberCheckJob | null>(null);
   const [loading, setLoading] = useState(true);

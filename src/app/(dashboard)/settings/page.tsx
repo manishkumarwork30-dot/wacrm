@@ -34,11 +34,11 @@ export default function SettingsPage() {
   // local state, no sync effect. A previous revision duplicated this
   // into `useState` + a sync effect, which tripped React 19's
   // set-state-in-effect rule and was also redundant.
-  const queryTab = searchParams.get('tab');
-  const tab: TabValue = isTabValue(queryTab) ? queryTab : 'profile';
+  const queryTab = searchParams?.get('tab');
+  const tab: TabValue = isTabValue(queryTab || null) ? (queryTab as TabValue) : 'profile';
 
   const onChange = (next: TabValue) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || '');
     params.set('tab', next);
     router.replace(`/settings?${params.toString()}`, { scroll: false });
   };
