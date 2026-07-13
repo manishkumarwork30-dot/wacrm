@@ -30,7 +30,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "node -e \"const { execSync } = require('child_process'); if (process.env.VERCEL === '1') { execSync('next build', { stdio: 'inherit' }); } else { execSync('opennextjs-cloudflare build', { stdio: 'inherit' }); }\"",
+    "build": "next build",
     "build:cf": "opennextjs-cloudflare build",
     "start": "next start",
     "lint": "eslint",
