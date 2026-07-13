@@ -203,8 +203,9 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Error in WhatsApp broadcast POST:', error)
+    const message = error instanceof Error ? error.message : 'Failed to process broadcast'
     return NextResponse.json(
-      { error: 'Failed to process broadcast' },
+      { error: message },
       { status: 500 }
     )
   }
