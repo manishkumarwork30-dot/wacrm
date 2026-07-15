@@ -244,20 +244,64 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     supabase: ReturnType<typeof createClient>,
     csvContacts: { phone: string; name?: string }[],
   ): Promise<string[]> {
-    const contactIds: string[] = [];
-    for (const item of csvContacts) {
-      const { data, error } = await supabase
-        .from('contacts')
-        .upsert(
-          { phone: item.phone, name: item.name || null },
-          { onConflict: 'phone' },
-        )
-        .select('id')
-        .single();
-      if (error) throw new Error(`Failed to sync CSV contact: ${error.message}`);
-      if (data) contactIds.push(data.id);
+    if (csvContacts.length === 0) return [];
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      throw new Error('You are not signed in.');
     }
-    return contactIds;
+
+    const uniqueByPhone = new Map<string, { phone: string; name?: string }>();
+    for (const row of csvContacts) {
+      if (row.phone) uniqueByPhone.set(row.phone, row);
+    }
+    const phones = [...uniqueByPhone.keys()];
+
+    const { data: existing, error: lookupErr } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('phone', phones);
+    
+    if (lookupErr) {
+      throw new Error(`Failed to look up CSV contacts: ${lookupErr.message}`);
+    }
+
+    const byPhone = new Map<string, Contact>();
+    for (const c of (existing ?? []) as Contact[]) {
+      if (c.phone) byPhone.set(c.phone, c);
+    }
+
+    const missing = phones
+      .filter((p) => !byPhone.has(p))
+      .map((phone) => ({
+        user_id: user.id,
+        phone,
+        name: uniqueByPhone.get(phone)?.name ?? null,
+      }));
+
+    const INSERT_CHUNK = 200;
+    for (let i = 0; i < missing.length; i += INSERT_CHUNK) {
+      const chunk = missing.slice(i, i + INSERT_CHUNK);
+      const { data: inserted, error: insertErr } = await supabase
+        .from('contacts')
+        .insert(chunk)
+        .select();
+      
+      if (insertErr) {
+        throw new Error(`Failed to create CSV contacts: ${insertErr.message}`);
+      }
+      for (const c of (inserted ?? []) as Contact[]) {
+        if (c.phone) byPhone.set(c.phone, c);
+      }
+    }
+
+    return phones
+      .map((p) => byPhone.get(p)?.id)
+      .filter((id): id is string => Boolean(id));
   }
 
   async function fetchContactsByIds(
