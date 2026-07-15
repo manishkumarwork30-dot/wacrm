@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Radio, Plus, Loader2 } from 'lucide-react';
+import { Radio, Plus, Loader2, Smartphone, MessageCircle } from 'lucide-react';
 import { getBroadcastStatus } from '@/lib/broadcast-status';
 
 /**
@@ -216,7 +216,7 @@ export default function BroadcastsPage() {
             <TableHeader>
               <TableRow className="border-slate-800 hover:bg-transparent">
                 <TableHead className="text-slate-400">Name</TableHead>
-                <TableHead className="hidden text-slate-400 md:table-cell">Template</TableHead>
+                <TableHead className="hidden text-slate-400 md:table-cell">Channel / Template</TableHead>
                 <TableHead className="hidden text-right text-slate-400 sm:table-cell">
                   Recipients
                 </TableHead>
@@ -239,7 +239,17 @@ export default function BroadcastsPage() {
                       {broadcast.name}
                     </TableCell>
                     <TableCell className="hidden text-slate-300 md:table-cell">
-                      {broadcast.template_name}
+                      {broadcast.channel === 'sms' ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium">
+                          <Smartphone className="size-3" />
+                          Android SMS
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
+                          <MessageCircle className="size-3" />
+                          WhatsApp ({broadcast.template_name})
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="hidden text-right text-slate-300 tabular-nums sm:table-cell">
                       {broadcast.total_recipients}

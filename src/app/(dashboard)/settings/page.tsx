@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Settings, Tag, User, Palette, MessageCircle, FileText } from 'lucide-react';
+import { Settings, Tag, User, Palette, MessageCircle, FileText, Smartphone } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { TagManager } from '@/components/settings/tag-manager';
@@ -11,10 +11,12 @@ import { SessionsCard } from '@/components/settings/sessions-card';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { ChatbotConfig } from '@/components/settings/chatbot-config';
 import { DocumentConfig } from '@/components/settings/document-config';
+import { SmsGatewayConfig } from '@/components/settings/sms-gateway-config';
 
 const TAB_VALUES = [
   'profile',
   'whatsapp',
+  'sms_gateway',
   'tags',
   'appearance',
   'chatbot',
@@ -48,7 +50,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Manage your profile, WhatsApp® integration, message templates, and
+          Manage your profile, WhatsApp® integration, SMS Gateway configuration, message templates, and
           tags.
         </p>
       </div>
@@ -68,6 +70,13 @@ export default function SettingsPage() {
           >
             <Settings className="size-4" />
             WhatsApp Config
+          </TabsTrigger>
+          <TabsTrigger
+            value="sms_gateway"
+            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+          >
+            <Smartphone className="size-4" />
+            SMS Gateway
           </TabsTrigger>
 
           <TabsTrigger
@@ -110,7 +119,9 @@ export default function SettingsPage() {
           <WhatsAppConfig />
         </TabsContent>
 
-
+        <TabsContent value="sms_gateway">
+          <SmsGatewayConfig />
+        </TabsContent>
 
         <TabsContent value="tags">
           <TagManager />

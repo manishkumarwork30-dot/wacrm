@@ -205,9 +205,9 @@ export interface Broadcast {
   id: string;
   user_id: string;
   name: string;
-  template_name: string;
-  template_language: string;
-  template_variables?: Record<string, unknown>;
+  template_name?: string | null;
+  template_language?: string | null;
+  template_variables?: Record<string, unknown> | null;
   audience_filter?: Record<string, unknown>;
   scheduled_at?: string;
   status: BroadcastStatus;
@@ -218,6 +218,8 @@ export interface Broadcast {
   replied_count: number;
   failed_count: number;
   created_at: string;
+  channel?: 'whatsapp' | 'sms';
+  sms_body?: string | null;
 }
 
 export interface BroadcastRecipient {

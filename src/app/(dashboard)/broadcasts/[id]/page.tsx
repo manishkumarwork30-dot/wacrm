@@ -293,12 +293,24 @@ export default function BroadcastDetailPage() {
                 {status.label}
               </span>
             </div>
-            <div className="mt-1 flex items-center gap-3 text-sm text-slate-400">
-              <span>Template: {broadcast.template_name}</span>
-              <span>-</span>
-              <span>
-                Created {new Date(broadcast.created_at).toLocaleDateString()}
-              </span>
+            <div className="mt-1 flex flex-col gap-1">
+              <div className="flex items-center gap-3 text-sm text-slate-400">
+                {broadcast.channel === 'sms' ? (
+                  <span>Channel: Android SMS</span>
+                ) : (
+                  <span>Template: {broadcast.template_name}</span>
+                )}
+                <span>-</span>
+                <span>
+                  Created {new Date(broadcast.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              {broadcast.channel === 'sms' && broadcast.sms_body && (
+                <div className="mt-2 text-xs text-slate-300 max-w-2xl bg-slate-950 p-3 rounded-lg border border-slate-850 whitespace-pre-wrap leading-relaxed">
+                  <span className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">SMS Body</span>
+                  {broadcast.sms_body}
+                </div>
+              )}
             </div>
           </div>
         </div>

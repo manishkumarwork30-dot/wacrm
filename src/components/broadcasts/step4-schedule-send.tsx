@@ -25,13 +25,15 @@ interface AudienceConfig {
 interface Step4Props {
   name: string;
   onNameChange: (name: string) => void;
-  template: MessageTemplate;
+  template?: MessageTemplate | null;
   audience: AudienceConfig;
   onSend: () => void;
   onSaveDraft?: () => void;
   onBack: () => void;
   isProcessing: boolean;
   progress: number;
+  channel?: 'whatsapp' | 'sms';
+  smsBody?: string;
 }
 
 export function Step4ScheduleSend({
@@ -44,6 +46,8 @@ export function Step4ScheduleSend({
   onBack,
   isProcessing,
   progress,
+  channel = 'whatsapp',
+  smsBody,
 }: Step4Props) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [estimatedReach, setEstimatedReach] = useState<number>(0);
@@ -90,6 +94,8 @@ export function Step4ScheduleSend({
           ? 'CSV Upload'
           : 'Custom';
 
+  const isSms = channel === 'sms';
+
   return (
     <div className="space-y-6">
       <div>
@@ -105,7 +111,7 @@ export function Step4ScheduleSend({
         <Input
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="e.g. Summer Sale Announcement"
+          placeholder={isSms ? "e.g. SMS Summer Sale Promo" : "e.g. Summer Sale Announcement"}
           className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
         />
       </div>
@@ -115,8 +121,8 @@ export function Step4ScheduleSend({
         <p className="text-sm font-medium text-white">Summary</p>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-xs text-slate-400">Template</p>
-            <p className="text-white">{template.name}</p>
+            <p className="text-xs text-slate-400">Channel</p>
+            <p className="text-white font-medium capitalize">{isSms ? 'Android SMS' : 'WhatsApp'}</p>
           </div>
           <div>
             <p className="text-xs text-slate-400">Audience</p>
@@ -135,10 +141,19 @@ export function Step4ScheduleSend({
               )}
             </div>
           </div>
-          <div>
-            <p className="text-xs text-slate-400">Language</p>
-            <p className="text-white">{template.language ?? 'en_US'}</p>
-          </div>
+          {!isSms ? (
+            <div>
+              <p className="text-xs text-slate-400">Template</p>
+              <p className="text-white">{template?.name || '-'}</p>
+            </div>
+          ) : (
+            <div className="col-span-2 border-t border-slate-850 pt-2 mt-1">
+              <p className="text-xs text-slate-400">Message Preview</p>
+              <p className="text-white mt-1 whitespace-pre-wrap rounded bg-slate-950 p-2 text-xs border border-slate-850">
+                {smsBody}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -201,10 +216,9 @@ export function Step4ScheduleSend({
             <DialogHeader>
               <DialogTitle className="text-white">Confirm Broadcast</DialogTitle>
               <DialogDescription className="text-slate-400">
-                You are about to send this broadcast to{' '}
+                You are about to send this {isSms ? 'SMS' : 'WhatsApp'} broadcast to{' '}
                 <span className="font-medium text-white">{estimatedReach.toLocaleString()}</span>{' '}
-                contacts using the{' '}
-                <span className="font-medium text-white">{template.name}</span> template.
+                contacts.
                 This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
